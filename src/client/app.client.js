@@ -142,7 +142,7 @@
   }
   function drawer() {
     const drItem = (r, ic, lbl, on, color, img) => `<button class="dr-item ${on ? 'on' : ''}" data-nav="${r}"><span class="dr-ic ${img ? 'img' : ''}" ${!img && color ? `style="background:${color}"` : ''}>${img ? `<img src="${esc(img)}" alt="">` : icon(ic)}</span><span class="dr-l">${esc(lbl)}</span><span class="dr-ch">${icon('right')}</span></button>`;
-    const nav = [['orders', 'box', u('orderHistory'), 'orders'], ['referrals', 'gift', u('referrals'), 'referrals'], ['profile', 'user', u('profile'), 'profile']].filter((x) => L('menu', x[3]));
+    const nav = [['home', 'home', u('dashboard')]];
     // services grouped: category header -> its products
     const active = S.services.filter((s) => s.active);
     const cats = (S.cats || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -411,10 +411,10 @@
   document.addEventListener('click', async (e) => {
     const lang = e.target.closest('[data-lang]'); if (lang) { S.lang = lang.dataset.lang; localStorage.setItem('lang', S.lang); render(); return; }
     const am = e.target.closest('[data-am]'); if (am) { e.preventDefault(); authMode = am.dataset.am; renderAuth(); return; }
-    const nav = e.target.closest('[data-nav]'); if (nav) { location.hash = '#' + nav.dataset.nav; S.drawer = false; return; }
+    const nav = e.target.closest('[data-nav]'); if (nav) { if (S.drawer) closeDrawer(); location.hash = '#' + nav.dataset.nav; return; }
     const back = e.target.closest('[data-back]'); if (back) { history.length > 1 ? history.back() : (location.hash = '#home'); return; }
     if (e.target.closest('[data-act="drawer"]')) { S.drawer = true; render(); return; }
-    if (e.target.closest('[data-act="drawer-close"]')) { S.drawer = false; render(); return; }
+    if (e.target.closest('[data-act="drawer-close"]')) { closeDrawer(); return; }
     if (e.target.closest('[data-act="logout"]')) { await api('/api/auth/logout', {}); S.user = null; location.hash = '#home'; render(); return; }
     const cp = e.target.closest('[data-copy]'); if (cp) { navigator.clipboard && navigator.clipboard.writeText(cp.dataset.copy); toast(u('copied')); return; }
     const sh = e.target.closest('[data-share]'); if (sh) { if (navigator.share) navigator.share({ url: sh.dataset.share, title: S.settings.brandA + ' ' + S.settings.brandB }); else { navigator.clipboard && navigator.clipboard.writeText(sh.dataset.share); toast(u('copied')); } return; }
@@ -425,6 +425,7 @@
   window.addEventListener('hashchange', () => { if (!S.user) return; if (S.drawer) S.drawer = false; const m = document.querySelector('[data-sheet]'); if (m) m.remove(); renderRoute(); updateTabs(); window.scrollTo(0, 0); });
   function updateTabs() { document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('on', b.dataset.nav === S.route)); document.querySelectorAll('.dr-item').forEach((b) => b.classList.toggle('on', b.dataset.nav === S.route)); }
 
+  function closeDrawer() { S.drawer = false; const d = $('.drawer'), sc = document.querySelector('.scrim'); if (d) d.classList.remove('on'); if (sc) sc.classList.remove('on'); }
   function render() { if (!S.user) renderAuth(); else renderShell(); }
 
   /* ---------- boot ---------- */
