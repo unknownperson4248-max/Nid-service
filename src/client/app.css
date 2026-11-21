@@ -46,11 +46,16 @@ h1,h2,h3,h4{font-family:var(--disp);margin:0;line-height:1.2;letter-spacing:-.01
 .dr-user .avatar{background:rgba(255,255,255,.22)}
 .dr-user b{font-size:15px}.dr-user small{color:#d1fae5}
 .dr-body{overflow-y:auto;padding:10px 10px 20px;flex:1}
-.dr-sec{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:14px 12px 6px}
-.dr-item{display:flex;align-items:center;gap:13px;padding:12px;border-radius:13px;font-weight:600;color:var(--ink);width:100%;border:0;background:none;text-align:left}
-.dr-item .ic{width:21px;height:21px;color:var(--brand)}
-.dr-item.on,.dr-item:active{background:var(--bg)}
-.dr-item.on{background:linear-gradient(135deg,#ecfdf5,#d1fae5);color:var(--brand-d)}
+.dr-sec{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:16px 12px 8px}
+.dr-item{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:14px;font-weight:600;color:var(--ink);width:100%;border:0;background:none;text-align:left;margin-bottom:2px}
+.dr-ic{width:38px;height:38px;border-radius:11px;background:#0e1726;color:#fff;display:grid;place-items:center;flex:none;box-shadow:0 4px 10px -6px rgba(14,23,38,.6)}
+.dr-ic .ic{width:20px;height:20px;stroke-width:2.1}
+.dr-l{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dr-ch{color:#cbd5e1;flex:none}.dr-ch .ic{width:18px;height:18px}
+.dr-item.on,.dr-item:active{background:linear-gradient(135deg,#ecfdf5,#d1fae5)}
+.dr-item.on{color:var(--brand-d)}
+.dr-item.on .dr-ic{background:linear-gradient(135deg,var(--brand2),var(--brand))}
+.dr-item.on .dr-ch{color:var(--brand)}
 .dr-item .chip{margin-left:auto;font-size:11px;background:var(--brand);color:#fff;padding:2px 8px;border-radius:999px;font-weight:700}
 
 /* ---------- page / cards ---------- */
