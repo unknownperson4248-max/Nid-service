@@ -79,7 +79,7 @@
     app.setAttribute('aria-busy', 'false');
     const B = S.settings || { brandA: 'WizeFF', brandB: 'TopUp', tagline: { bn: 'দ্রুত • নিরাপদ • বিশ্বস্ত', en: 'Fast • Safe • Reliable' } };
     app.innerHTML = `<div class="auth"><div class="auth-card">
-      <div class="auth-logo"><div class="logo-mark">${icon('bolt')}</div>
+      <div class="auth-logo">${B.logo ? `<img class="auth-logo-img" src="${esc(B.logo)}" alt="">` : `<div class="logo-mark">${icon('bolt')}</div>`}
         <h1>${esc(B.brandA)} <em>${esc(B.brandB)}</em></h1><p>${esc(t(B.tagline))}</p></div>
       <div class="auth-tabs"><button data-am="login" class="${authMode === 'login' ? 'on' : ''}">${u('login')}</button><button data-am="register" class="${authMode === 'register' ? 'on' : ''}">${u('register')}</button></div>
       <div id="auth-err"></div>
@@ -146,9 +146,8 @@
     const uncat = active.filter((s) => !cats.some((c) => c.id === (s.cat || '')));
     if (uncat.length) svcHtml += `<div class="dr-sec">${u('services')}</div>` + uncat.map((s) => drItem('service/' + s.id, s.icon || 'bolt', t(s.name), false, svcColor(s), s.image)).join('');
     return `<aside class="drawer ${S.drawer ? 'on' : ''}">
-      <div class="dr-head"><div class="dr-top"><div class="logo"><span class="logo-mark">${icon('bolt')}</span><span class="logo-t">${esc(S.settings.brandA)} <em>${esc(S.settings.brandB)}</em></span></div>
-        <button class="dr-back" data-act="drawer-close" aria-label="back">${icon('left')}</button></div>
-        <div class="dr-user"><span class="avatar">${initials(S.user.name)}</span><span><b>${esc(S.user.name)}</b><br><small>${money(S.user.balance)} • ${esc(S.user.phone)}</small></span></div></div>
+      <div class="dr-head"><div class="dr-top"><button class="dr-back" data-act="drawer-close" aria-label="back">${icon('left')}</button>
+        <div class="logo">${S.settings.logo ? `<img class="logo-img" src="${esc(S.settings.logo)}" alt="">` : ''}<span class="logo-t">${esc(S.settings.brandA)} <em>${esc(S.settings.brandB)}</em></span></div></div></div>
       <div class="dr-body">
         ${nav.map(([r, ic, lbl]) => drItem(r, ic, lbl, S.route === r)).join('')}
         ${svcHtml}

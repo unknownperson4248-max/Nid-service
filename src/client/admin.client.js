@@ -255,7 +255,19 @@
   async function vSettings() {
     const c = $('#content'); c.innerHTML = '<div class="spin"></div>';
     const r = await api('/api/admin/settings'); const s = r.settings || {};
-    c.innerHTML = `<div class="card"><div class="card-h">${icon('cog')}General</div><div class="card-b">
+    S.logo = s.logo || '';
+    c.innerHTML = `<div class="card"><div class="card-h">${icon('eye')}Website, SEO & Theme</div><div class="card-b">
+      <div class="field"><label>Website title (browser tab & Google)</label><input id="s-seot" maxlength="90" value="${esc(s.seoTitle || '')}" placeholder="e.g. WizeFF TopUp – Free Fire Diamond Top Up BD"></div>
+      <div class="field"><label>Description (Google & share preview)</label><textarea id="s-seod" maxlength="300" placeholder="Short line about your service">${esc(s.seoDesc || '')}</textarea><div class="muted" style="font-size:11px">Shows under your site name on Google and when the link is shared.</div></div>
+      <div class="grid2">
+        <div class="field"><label>Logo</label><div class="flex"><div id="s-logoprev" class="iconbox" style="width:54px;height:54px;background:#eef2f5;overflow:hidden">${s.logo ? `<img src="${esc(s.logo)}" style="width:100%;height:100%;object-fit:cover">` : icon('eye')}</div>
+          <button type="button" class="btn btn-ghost btn-sm" id="s-logobtn">${icon('plus')}Upload logo</button><button type="button" class="btn btn-bad btn-sm" id="s-logodel" ${s.logo ? '' : 'style="display:none"'}>Remove</button></div>
+          <input type="file" id="s-logofile" accept="image/*" style="display:none"><div class="muted" style="font-size:11px;margin-top:4px">Square image works best. Also used as the browser icon.</div></div>
+        <div class="field"><label>Theme color</label><div class="flex"><input id="s-theme" type="color" value="${esc(s.themeColor || '#0f766e')}" style="width:70px;height:46px;padding:3px"><span class="muted" style="font-size:12px">Whole site follows this color.</span></div>
+          <div class="flex" style="margin-top:8px">${['#0f766e', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#0e1726', '#16a34a', '#dc2626'].map((h) => `<button type="button" data-theme-pick="${h}" style="width:28px;height:28px;border-radius:8px;border:2px solid #fff;box-shadow:0 0 0 1px #cbd5e1;background:${h}"></button>`).join('')}</div></div>
+      </div>
+    </div></div>
+    <div class="card" style="margin-top:16px"><div class="card-h">${icon('cog')}General</div><div class="card-b">
       <div class="grid2"><div class="field"><label>Brand name A</label><input id="s-a" value="${esc(s.brandA || '')}"></div><div class="field"><label>Brand name B (colored)</label><input id="s-b" value="${esc(s.brandB || '')}"></div>
       <div class="field"><label>Tagline</label><input id="s-tbn" value="${esc(tl(s.tagline))}"></div><div></div>
       <div class="field"><label>Currency</label><input id="s-cur" value="${esc(s.currency || '৳')}" maxlength="3"></div><div class="field"><label>Min deposit (৳)</label><input id="s-min" type="number" value="${s.minDeposit || 20}"></div>
@@ -264,11 +276,21 @@
     <div class="card" style="margin-top:16px"><div class="card-h">${icon('wallet')}Payment numbers<button class="btn btn-sm" data-act="add-method" style="margin-left:auto">${icon('plus')}Add</button></div><div class="card-b"><div id="methods">${(s.depositMethods || []).map(methodRow).join('')}</div></div></div>
     <div style="margin-top:16px"><button class="btn btn-ok" id="s-save">${icon('check')}Save settings</button></div>`;
     $('#s-save').addEventListener('click', saveSettings);
+    $('#s-logobtn').addEventListener('click', () => $('#s-logofile').click());
+    $('#s-logodel').addEventListener('click', () => { S.logo = ''; $('#s-logoprev').innerHTML = icon('eye'); $('#s-logodel').style.display = 'none'; });
+    $('#s-logofile').addEventListener('change', async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      if (file.size > 2 * 1024 * 1024) { toast('Image too big (max 2MB)'); return; }
+      const dataUrl = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
+      toast('Uploading...'); const up = await api('/api/admin/upload', { dataUrl });
+      if (up.ok) { S.logo = up.path; $('#s-logoprev').innerHTML = `<img src="${esc(up.path)}" style="width:100%;height:100%;object-fit:cover">`; $('#s-logodel').style.display = ''; toast('Logo ready — press Save'); } else toast('Upload failed');
+    });
+    document.querySelectorAll('[data-theme-pick]').forEach((b) => b.addEventListener('click', () => { $('#s-theme').value = b.dataset.themePick; }));
   }
   const methodRow = (m) => `<div class="fieldrow" data-method><div class="grid2"><div class="field"><label>Label</label><input data-ml value="${esc(m.label || '')}"></div><div class="field"><label>Number</label><input data-mn value="${esc(m.number || '')}" placeholder="01XXXXXXXXX"></div><div class="field"><label>Type</label><input data-mt value="${esc(m.type || 'Personal')}"></div><div class="field"><label>Color</label><input data-mc type="color" value="${esc(m.color || '#0f766e')}" style="height:42px;padding:3px"></div></div><div style="text-align:right"><button class="btn btn-bad btn-sm" data-del-method>${icon('trash')}</button></div></div>`;
   async function saveSettings() {
     const methods = [...document.querySelectorAll('[data-method]')].map((el) => ({ id: (el.querySelector('[data-ml]').value || 'm').toLowerCase().replace(/[^a-z0-9]/g, ''), label: el.querySelector('[data-ml]').value.trim(), number: el.querySelector('[data-mn]').value.trim(), type: el.querySelector('[data-mt]').value.trim(), color: el.querySelector('[data-mc]').value })).filter((m) => m.label);
-    const settings = { brandA: $('#s-a').value.trim(), brandB: $('#s-b').value.trim(), tagline: $('#s-tbn').value.trim(), currency: $('#s-cur').value.trim() || '৳', minDeposit: Number($('#s-min').value) || 20, referralBonus: Number($('#s-ref').value) || 0, whatsapp: $('#s-wa').value.replace(/[^0-9]/g, ''), depositMethods: methods };
+    const settings = { seoTitle: $('#s-seot').value.trim(), seoDesc: $('#s-seod').value.trim(), logo: S.logo || '', themeColor: $('#s-theme').value, brandA: $('#s-a').value.trim(), brandB: $('#s-b').value.trim(), tagline: $('#s-tbn').value.trim(), currency: $('#s-cur').value.trim() || '৳', minDeposit: Number($('#s-min').value) || 20, referralBonus: Number($('#s-ref').value) || 0, whatsapp: $('#s-wa').value.replace(/[^0-9]/g, ''), depositMethods: methods };
     const r = await api('/api/admin/settings', { settings }); if (r.ok) toast('Saved ✓'); else toast('Error');
   }
 

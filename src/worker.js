@@ -245,7 +245,7 @@ async function handleApi(req, env, url, path, u, secure) {
 }
 
 const maskName = (n) => { const s = String(n || '').trim(); return s.length <= 2 ? s : s.slice(0, Math.max(2, s.length - 3)) + '***'; };
-const pubSettings = (s) => ({ brandA: s.brandA, brandB: s.brandB, tagline: s.tagline, currency: s.currency, minDeposit: s.minDeposit,
+const pubSettings = (s) => ({ brandA: s.brandA, brandB: s.brandB, logo: safeImg(s.logo), themeColor: safeHex(s.themeColor), tagline: s.tagline, currency: s.currency, minDeposit: s.minDeposit,
   depositMethods: s.depositMethods, referralBonus: s.referralBonus, whatsapp: s.whatsapp });
 async function bumpStat(env, k) { const key = 'stat:' + k; const n = +((await env.DATA.get(key)) || 0); await env.DATA.put(key, String(n + 1)); }
 
@@ -381,6 +381,8 @@ async function handleAdmin(req, env, url, path, u) {
       let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
       const cur = await getSettings(env);
       const next = { ...cur, ...b.settings };
+      next.themeColor = safeHex(next.themeColor); next.logo = safeImg(next.logo);
+      next.seoTitle = clip(next.seoTitle, 90); next.seoDesc = clip(next.seoDesc, 300);
       await env.DATA.put('settings', JSON.stringify(next));
       return json({ ok: true });
     }
@@ -399,6 +401,37 @@ async function syncUserDeposit(env, d) {
   const dl = (await env.DATA.get('udep:' + d.uid, 'json')) || [];
   const i = dl.findIndex((x) => x.id === d.id);
   if (i >= 0) { dl[i].status = d.status; await env.DATA.put('udep:' + d.uid, JSON.stringify(dl)); }
+}
+
+
+/* ---------- theme + SEO ---------- */
+const safeHex = (h) => (/^#[0-9a-f]{6}$/i.test(String(h || '')) ? String(h).toLowerCase() : '#0f766e');
+const safeImg = (p) => (/^\/img\/[a-z0-9]{10,24}$/.test(String(p || '')) ? String(p) : '');
+function shade(hex, p) { // p: -1 (black) .. 1 (white)
+  const n = parseInt(hex.slice(1), 16), t = p < 0 ? 0 : 255, a = Math.abs(p);
+  const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round((t - v) * a + v));
+  return '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('');
+}
+const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+async function renderShellHtml(env, url) {
+  const s = await getSettings(env);
+  const theme = safeHex(s.themeColor), logo = safeImg(s.logo);
+  const title = escHtml(String(s.seoTitle || `${s.brandA} ${s.brandB}`).slice(0, 90));
+  const desc = escHtml(String(s.seoDesc || '').slice(0, 300));
+  const head = [
+    `<title>${title}</title>`,
+    `<meta name="description" content="${desc}">`,
+    `<meta name="theme-color" content="${theme}">`,
+    `<meta property="og:type" content="website">`,
+    `<meta property="og:title" content="${title}">`,
+    `<meta property="og:description" content="${desc}">`,
+    `<meta property="og:url" content="${escHtml(url.origin + '/')}">`,
+    logo ? `<meta property="og:image" content="${escHtml(url.origin + logo)}">` : '',
+    logo ? `<link rel="icon" href="${logo}">` : '',
+    `<link rel="canonical" href="${escHtml(url.origin + '/')}">`,
+    `<style>:root{--brand:${theme};--brand2:${shade(theme, 0.28)};--brand-d:${shade(theme, -0.25)}}</style>`,
+  ].filter(Boolean).join('\n');
+  return APP_HTML.replace(/\{\{V\}\}/g, VERSION).replace('<!--HEAD-->', head);
 }
 
 /* ---------------- router ---------------- */
@@ -429,7 +462,7 @@ export default {
         return new Response('Not found', { status: 404 });
       }
       // SPA: everything else serves the app shell
-      return text(APP_HTML.replace(/\{\{V\}\}/g, VERSION), 'text/html; charset=utf-8', 'no-store');
+      return text(await renderShellHtml(env, url), 'text/html; charset=utf-8', 'no-store');
     } catch (e) {
       return json({ ok: false, error: 'server', message: String(e && e.message || e) }, 500);
     }
