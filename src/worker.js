@@ -280,7 +280,7 @@ async function handleAdmin(req, env, url, path, u) {
       const owner = await env.DATA.get('u:' + o.uid, 'json');
       if (owner) { owner.balance = Math.round((owner.balance || 0) + o.amount); await env.DATA.put('u:' + o.uid, JSON.stringify(owner)); }
     }
-    o.status = st; o.note = clip(b.note, 300);
+    o.status = st; o.note = clip(b.note, 1000); o.respImg = safeImg(b.respImg);
     await env.DATA.put(b.key, JSON.stringify(o), { metadata: { id: o.id, uid: o.uid, status: st, ts: o.ts, n: o.svcName, un: maskName(o.uname), amt: o.amount, cat: o.cat } });
     await syncUserOrder(env, o);
     return json({ ok: true });

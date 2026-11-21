@@ -87,10 +87,17 @@
     modal(`Order ${esc(o.id)}`, `
       <div class="flex" style="margin-bottom:10px">${badge(o.status)}<span class="pill">${new Date(o.ts).toLocaleString('en-GB')}</span></div>
       <div class="kvs"><div><span class="k">Customer:</span> <b>${esc(o.uname)}</b></div><div><span class="k">Service:</span> <b>${esc(tl(o.svcName))}</b></div><div><span class="k">Amount:</span> <b>${money(o.amount)}</b></div>${rows}</div>
-      <div class="field" style="margin-top:12px"><label>Note to customer</label><textarea id="o-note" maxlength="300">${esc(o.note || '')}</textarea></div>
-      <div class="field"><label>Status</label><select id="o-status">${['pending', 'processing', 'done', 'rejected'].map((s) => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s}${s === 'rejected' ? ' (refunds balance)' : ''}</option>`).join('')}</select></div>`,
+      <div class="field"><label>Status (set manually)</label><select id="o-status">${['pending', 'processing', 'done', 'rejected'].map((s) => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s === 'done' ? 'done (complete)' : s === 'rejected' ? 'rejected / cancel (refunds balance)' : s}</option>`).join('')}</select></div>
+      <div class="field"><label>Response message to customer</label><textarea id="o-note" maxlength="1000" placeholder="e.g. Delivered. Thanks!">${esc(o.note || '')}</textarea></div>
+      <div class="field"><label>Response image (optional)</label><div class="flex"><div id="o-imgprev" class="iconbox" style="width:54px;height:54px;background:#eef2f5;overflow:hidden">${o.respImg ? `<img src="${esc(o.respImg)}" style="width:100%;height:100%;object-fit:cover">` : icon('eye')}</div>
+        <button type="button" class="btn btn-ghost btn-sm" id="o-imgbtn">${icon('plus')}Upload image</button><button type="button" class="btn btn-bad btn-sm" id="o-imgdel" ${o.respImg ? '' : 'style="display:none"'}>Remove</button></div>
+        <input type="file" id="o-imgfile" accept="image/*" style="display:none"><div class="muted" style="font-size:11px;margin-top:4px">The customer sees this image in their order. Max 2MB.</div></div>`,
       `<button class="btn btn-ghost" data-close>Close</button><button class="btn btn-ok" id="o-save">${icon('check')}Save</button>`);
-    $('#o-save').addEventListener('click', async () => { const r = await api('/api/admin/order', { key: o.key, status: $('#o-status').value, note: $('#o-note').value }); if (r.ok) { toast('Updated'); closeModal(); vOrders(); loadCounts(); } else toast('Error'); });
+    let respImg = o.respImg || '';
+    $('#o-imgbtn').addEventListener('click', () => $('#o-imgfile').click());
+    $('#o-imgdel').addEventListener('click', () => { respImg = ''; $('#o-imgprev').innerHTML = icon('eye'); $('#o-imgdel').style.display = 'none'; });
+    $('#o-imgfile').addEventListener('change', async (e) => { const f = e.target.files[0]; if (!f) return; if (f.size > 2 * 1024 * 1024) { toast('Max 2MB'); return; } const dataUrl = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(f); }); toast('Uploading...'); const up = await api('/api/admin/upload', { dataUrl }); if (up.ok) { respImg = up.path; $('#o-imgprev').innerHTML = `<img src="${esc(up.path)}" style="width:100%;height:100%;object-fit:cover">`; $('#o-imgdel').style.display = ''; } else toast('Upload failed'); });
+    $('#o-save').addEventListener('click', async () => { const r = await api('/api/admin/order', { key: o.key, status: $('#o-status').value, note: $('#o-note').value, respImg }); if (r.ok) { toast('Updated'); closeModal(); vOrders(); loadCounts(); } else toast('Error'); });
   }
 
   /* ---------- deposits ---------- */

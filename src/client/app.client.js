@@ -2,6 +2,7 @@
   'use strict';
   const app = document.getElementById('app');
   const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   const ICONS = {
@@ -124,6 +125,7 @@
       </div></header>
       <main class="wrap page" id="view"></main>
       ${tabbar()}
+      ${B.whatsapp ? `<a class="wa-float" href="https://wa.me/${esc(B.whatsapp)}" target="_blank" rel="noopener" aria-label="${u('support')}">${icon('whatsapp')}</a>` : ''}
       ${drawer()}
       <div class="scrim ${S.drawer ? 'on' : ''}" data-act="drawer-close"></div>`;
     renderRoute();
@@ -293,26 +295,53 @@
     v.innerHTML = `<div class="ph"><button class="back" data-back>${icon('left')}</button><h2>${u('orderHistory')}</h2></div>
       ${items.length ? `<div class="card">${items.map(orderRow).join('')}</div>` : emptyBox(u('noOrders'))}<div style="height:10px"></div>`;
   }
-  const orderRow = (o) => `<button class="ord-row" style="width:100%;text-align:left" data-order='${esc(JSON.stringify({ id: o.id, svcName: o.svcName, fields: o.fields, amount: o.amount, status: o.status, ts: o.ts, note: o.note }))}'>
+  const orderRow = (o) => `<button class="ord-row" style="width:100%;text-align:left" data-order='${esc(JSON.stringify({ id: o.id, svcId: o.svcId, svcName: o.svcName, fields: o.fields, amount: o.amount, status: o.status, ts: o.ts, note: o.note, respImg: o.respImg }))}'>
     <span class="ord-av">${icon('box')}</span><span class="ord-main"><b>${esc(t(o.svcName))}</b><small>${o.id} • ${ago(o.ts)} • ${money(o.amount)}</small></span>${statusBadge(o.status)}</button>`;
 
   /* ---------- deposit / add money ---------- */
   async function viewDeposit(v) {
     const methods = (S.settings.depositMethods || []).filter((m) => m.number);
+    const min = S.settings.minDeposit || 20;
+    const chips = [50, 100, 200, 500, 1000, 2000].filter((a) => a >= min);
+    const en = S.lang === 'en';
     v.innerHTML = `<div class="ph"><button class="back" data-back>${icon('left')}</button><div><h2>${u('addMoney')}</h2><div class="sub">${u('walletBalance')}: ${money(S.user.balance)}</div></div></div>
-      <div class="notice"><div class="notice-h">${icon('info')}<span>${u('addMoney')}</span></div><div class="notice-b">${u('depositNote')}</div></div>
-      ${methods.length ? methods.map((m) => `<div class="card card-pad" style="margin-bottom:11px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span class="qs-ic" style="width:40px;height:40px;background:${m.color || '#0f766e'}">${icon('wallet')}</span><b style="font-size:16px">${esc(m.label)}</b><span class="badge b-processing" style="margin-left:auto">${esc(m.type || 'Personal')}</span></div><div class="copy-box">${esc(m.number)}<button data-copy="${esc(m.number)}">${u('copy')}</button></div></div>`).join('') : `<div class="notice urgent"><div class="notice-b">${S.lang === 'en' ? 'Payment numbers not set yet. Contact support.' : 'পেমেন্ট নম্বর এখনো সেট করা হয়নি। সাপোর্টে যোগাযোগ করুন।'}</div></div>`}
-      <div id="dep-err"></div>
+
+      <div class="card card-pad" style="margin-bottom:14px">
+        <div class="fld-lbl">${en ? 'Amount' : 'এমাউন্ট'} <span class="req">*</span></div>
+        <div class="amt-chips">${chips.map((a) => `<button type="button" class="amt" data-amt="${a}">${money(a)}</button>`).join('')}</div>
+        <input id="dep-amt" type="number" inputmode="numeric" min="${min}" placeholder="${en ? 'Or type amount' : 'অথবা এমাউন্ট লিখুন'} (${u('min')} ${money(min)})">
+      </div>
+
+      <div class="pay-lbl">${en ? 'Pay with' : 'যেভাবে পেমেন্ট করবেন'} <span class="req">*</span></div>
+      ${methods.length ? `<div class="pay-methods">${methods.map((m, i) => `<button type="button" class="pay-m" data-m="${i}" style="--c:${m.color || 'var(--brand)'}">
+        <span class="pay-badge">${esc((m.label || '?').slice(0, 2))}</span><span class="pay-nm"><b>${esc(m.label)}</b><small>${esc(m.type || 'Personal')}</small></span><span class="pay-check">${icon('check')}</span></button>`).join('')}</div>
+      <div id="pay-detail"></div>` : `<div class="notice urgent"><div class="notice-b">${en ? 'Payment numbers not set yet. Contact support.' : 'পেমেন্ট নম্বর এখনো সেট করা হয়নি। সাপোর্টে যোগাযোগ করুন।'}</div></div>`}
+
+      <div id="dep-err" style="margin-top:14px"></div>
       <form id="dep-form" class="card card-pad">
-        <div class="field"><label>${u('method')} <span class="req">*</span></label><select name="method" required><option value="">${S.lang === 'en' ? 'Select...' : 'নির্বাচন...'}</option>${(S.settings.depositMethods || []).map((m) => `<option value="${esc(m.label)}">${esc(m.label)}</option>`).join('')}</select></div>
+        <input type="hidden" name="method" value=""><input type="hidden" name="amount" value="">
         <div class="field"><label>${u('senderNo')} <span class="req">*</span></label><input name="sender" type="tel" inputmode="numeric" maxlength="11" placeholder="01XXXXXXXXX" required></div>
         <div class="field"><label>${u('trxid')} <span class="req">*</span></label><input name="trxid" maxlength="40" placeholder="TrxID" required></div>
-        <div class="field"><label>${u('amount')} (৳) <span class="req">*</span></label><input name="amount" type="number" inputmode="numeric" min="${S.settings.minDeposit || 20}" placeholder="${u('min')} ${money(S.settings.minDeposit || 20)}" required></div>
         <button class="btn" type="submit">${icon('check')}${u('submit')}</button>
       </form>
-      <div class="sec-h">${icon('clock')}${S.lang === 'en' ? 'Deposit history' : 'ডিপোজিট হিস্টোরি'}</div>
+      <div class="sec-h">${icon('clock')}${en ? 'Deposit history' : 'ডিপোজিট হিস্টোরি'}</div>
       <div class="card" id="dep-list"><div class="spin"></div></div><div style="height:10px"></div>`;
-    $('#dep-form').addEventListener('submit', async (e) => { e.preventDefault(); await submitDeposit(e.target); });
+
+    const form = $('#dep-form'), amtInput = $('#dep-amt');
+    const setAmt = (a) => { form.querySelector('[name=amount]').value = a || ''; };
+    $$('.amt').forEach((b) => b.addEventListener('click', () => { $$('.amt').forEach((x) => x.classList.remove('on')); b.classList.add('on'); amtInput.value = b.dataset.amt; setAmt(b.dataset.amt); }));
+    amtInput.addEventListener('input', () => { $$('.amt').forEach((x) => x.classList.toggle('on', x.dataset.amt === amtInput.value)); setAmt(amtInput.value); });
+    $$('.pay-m').forEach((b) => b.addEventListener('click', () => {
+      $$('.pay-m').forEach((x) => x.classList.remove('on')); b.classList.add('on');
+      const m = methods[+b.dataset.m]; form.querySelector('[name=method]').value = m.label;
+      $('#pay-detail').innerHTML = `<div class="pay-detail" style="--c:${m.color || 'var(--brand)'}">
+        <div class="pay-steps"><span>1 ${en ? 'Send Money' : 'Send Money'}</span><span>2 ${en ? 'Copy TrxID' : 'TrxID কপি'}</span><span>3 ${en ? 'Submit' : 'সাবমিট'}</span></div>
+        <div class="pay-num-lbl">${esc(m.label)} (${esc(m.type || 'Personal')}) ${en ? 'number' : 'নম্বর'}</div>
+        <div class="pay-num"><b>${esc(m.number)}</b><button type="button" class="pay-copy" data-copy="${esc(m.number)}">${icon('copy')}${u('copy')}</button></div>
+        <p class="pay-hint">${u('depositNote')}</p></div>`;
+      $('#pay-detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }));
+    form.addEventListener('submit', async (e) => { e.preventDefault(); await submitDeposit(e.target); });
     const dr = await api('/api/deposits');
     const el = $('#dep-list'); if (el) el.innerHTML = (dr.items && dr.items.length) ? dr.items.map((d) => `<div class="ord-row"><span class="ord-av">${icon('wallet')}</span><span class="ord-main"><b>${money(d.amount)} • ${esc(d.method)}</b><small>${d.id} • ${ago(d.ts)}</small></span>${statusBadge(d.status === 'pending' ? 'pending' : d.status === 'approved' ? 'approved' : 'rejected')}</div>`).join('') : emptyBox(u('noOrders'));
   }
@@ -371,7 +400,10 @@
       ${rows}
       <div class="kv"><span class="k">${u('amount')}</span><span class="v">${money(o.amount)}</span></div>
       <div class="kv"><span class="k">${u('time')}</span><span class="v">${new Date(o.ts).toLocaleString('en-GB')}</span></div>
-      ${o.note ? `<div class="notice" style="margin-top:12px"><div class="notice-b">${esc(o.note)}</div></div>` : ''}`);
+      ${(o.note || o.respImg) ? `<div class="resp"><div class="resp-h">${icon('check')}${S.lang === 'en' ? 'Admin response' : 'অ্যাডমিন রেসপন্স'}</div>
+        ${o.note ? `<div class="resp-b" id="resp-txt">${esc(o.note)}</div><button class="btn btn-ghost btn-sm" data-copy="${esc(o.note)}" style="margin-top:8px">${icon('copy')}${u('copy')}</button>` : ''}
+        ${o.respImg ? `<a class="resp-img" href="${esc(o.respImg)}" target="_blank" rel="noopener"><img src="${esc(o.respImg)}" alt="" loading="lazy"><span class="resp-dl">${icon('eye')}${S.lang === 'en' ? 'View / download' : 'দেখুন / ডাউনলোড'}</span></a>` : ''}
+      </div>` : ''}`);
   }
   function openSheet(html) { const s = document.createElement('div'); s.className = 'modal-scrim'; s.dataset.sheet = '1'; s.innerHTML = `<div class="sheet">${html}</div>`; document.body.appendChild(s); }
 
@@ -404,7 +436,7 @@
     if (!location.hash) location.hash = '#home';
     render();
     // light live refresh of recent orders every 25s on home
-    setInterval(async () => { if (S.user && S.route === 'home' && !S.drawer && !document.hidden) { const r = await api('/api/home'); if (r.ok) { S.live = r.live || []; if (r.user) S.user = r.user; const v = $('#view'); if (v && S.route === 'home') viewHome(v); const w = $('.wallet span'); } } }, 25000);
+    setInterval(async () => { if (S.user && S.route === 'home' && !S.drawer && !document.hidden) { const r = await api('/api/home'); if (r.ok) { S.live = r.live || []; if (r.user) S.user = r.user; const v = $('#view'); if (v && S.route === 'home') viewHome(v); const w = $('.wallet span'); } } }, 45000);
   }
   boot();
 })();
