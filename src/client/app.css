@@ -277,3 +277,19 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
 @supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
   .top,.icon-btn,.wallet,.card,.qs{background:#fff}.tabbar,.drawer{background:#fbfdfe}
 }
+
+/* top bar: brand left, wallet + profile on the right */
+.top-in .logo{margin-right:auto;min-width:0;overflow:hidden}
+.top-in .logo-t{font-size:16px;white-space:nowrap}
+.top-right{display:flex;align-items:center;gap:9px;flex:none}
+.wallet{cursor:pointer}
+
+/* package selector tiles (replaces the dropdown) */
+.pk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:9px}
+.pk{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center;
+  padding:12px 8px;border-radius:15px;border:1.5px solid var(--line);background:var(--glass-2);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);transition:transform .15s,border-color .15s,box-shadow .2s}
+.pk:active{transform:scale(.96)}
+.pk-l{font-weight:700;font-size:14.5px;font-family:var(--disp)}
+.pk-p{font-size:12.5px;color:var(--muted);font-weight:600}
+.pk.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 12%,#fff);box-shadow:0 8px 18px -10px var(--brand)}
+.pk.on .pk-p{color:var(--brand-d)}

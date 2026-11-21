@@ -274,7 +274,7 @@
     const r = await api('/api/admin/settings'); const l = (r.settings && r.settings.layout) || {};
     const groups = [
       ['home', 'Dashboard sections', [['notices', 'Notice board'], ['products', 'Products (category boxes)'], ['recent', 'Recent orders (LIVE)']]],
-      ['menu', '3-dot menu items', [['recharge', 'Recharge / Add money'], ['orders', 'Order history'], ['referrals', 'Referrals'], ['profile', 'Profile']]],
+      ['menu', '3-dot menu items', [['orders', 'Order history'], ['referrals', 'Referrals'], ['profile', 'Profile']]],
       ['nav', 'Bottom navigation bar', [['orders', 'Orders'], ['addMoney', '+ Add money (center)'], ['referrals', 'Referrals'], ['profile', 'Profile']]],
     ];
     c.innerHTML = groups.map(([g, title, items]) => `<div class="card" style="margin-bottom:16px"><div class="card-h">${icon('grid')}${title}</div><div class="card-b">

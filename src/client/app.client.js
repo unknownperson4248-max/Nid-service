@@ -116,9 +116,11 @@
     app.innerHTML = `
       <header class="top"><div class="top-in">
         <button class="icon-btn" data-act="drawer" aria-label="menu">${icon('menu')}</button>
-        <div class="wallet" data-nav="deposit">${icon('wallet')}<span>${money(S.user.balance)}</span></div>
-        <button class="icon-btn" data-nav="orders" aria-label="orders">${icon('bell')}</button>
-        <button class="avatar" data-nav="profile">${initials(S.user.name)}</button>
+        <div class="logo">${B.logo ? `<img class="logo-img" src="${esc(B.logo)}" alt="">` : ''}<span class="logo-t">${esc(B.brandA)} <em>${esc(B.brandB)}</em></span></div>
+        <div class="top-right">
+          <div class="wallet" data-nav="deposit" title="${u('addMoney')}">${icon('wallet')}<span>${money(S.user.balance)}</span></div>
+          <button class="avatar" data-nav="profile">${initials(S.user.name)}</button>
+        </div>
       </div></header>
       <main class="wrap page" id="view"></main>
       ${tabbar()}
@@ -138,7 +140,7 @@
   }
   function drawer() {
     const drItem = (r, ic, lbl, on, color, img) => `<button class="dr-item ${on ? 'on' : ''}" data-nav="${r}"><span class="dr-ic ${img ? 'img' : ''}" ${!img && color ? `style="background:${color}"` : ''}>${img ? `<img src="${esc(img)}" alt="">` : icon(ic)}</span><span class="dr-l">${esc(lbl)}</span><span class="dr-ch">${icon('right')}</span></button>`;
-    const nav = [['deposit', 'wallet', u('recharge'), 'recharge'], ['orders', 'box', u('orderHistory'), 'orders'], ['referrals', 'gift', u('referrals'), 'referrals'], ['profile', 'user', u('profile'), 'profile']].filter((x) => L('menu', x[3]));
+    const nav = [['orders', 'box', u('orderHistory'), 'orders'], ['referrals', 'gift', u('referrals'), 'referrals'], ['profile', 'user', u('profile'), 'profile']].filter((x) => L('menu', x[3]));
     // services grouped: category header -> its products
     const active = S.services.filter((s) => s.active);
     const cats = (S.cats || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -152,8 +154,7 @@
       <div class="dr-body">
         ${nav.map(([r, ic, lbl]) => drItem(r, ic, lbl, S.route === r)).join('')}
         ${svcHtml}
-        <div class="dr-card"><b>${esc(u('walletBalance'))}: ${money(S.user.balance)}</b><p>${esc(u('depositNote'))}</p><a data-nav="deposit">${icon('plus')}${esc(u('addMoney'))}</a></div>
-        <button class="dr-item" data-act="logout" style="color:var(--bad);margin-top:6px"><span class="dr-ic" style="background:var(--bad)">${icon('logout')}</span><span class="dr-l">${u('logout')}</span></button>
+        <button class="dr-item" data-act="logout" style="color:var(--bad);margin-top:10px"><span class="dr-ic" style="background:var(--bad)">${icon('logout')}</span><span class="dr-l">${u('logout')}</span></button>
       </div></aside>`;
   }
 
@@ -239,11 +240,21 @@
     const form = $('#svc-form');
     const recalc = () => { $('#ord-total').textContent = money(calcPrice(s, formVals(form))); };
     form.addEventListener('input', recalc); form.addEventListener('change', recalc); recalc();
+    // package tiles: tap to select, fills the hidden input
+    form.querySelectorAll('[data-pk]').forEach((btn) => btn.addEventListener('click', () => {
+      const key = btn.dataset.pk;
+      form.querySelectorAll(`[data-pk="${key}"]`).forEach((b) => b.classList.remove('on'));
+      btn.classList.add('on');
+      form.querySelector(`input[name="${key}"]`).value = btn.dataset.v;
+      recalc();
+    }));
     form.addEventListener('submit', async (e) => { e.preventDefault(); await placeOrder(s, form); });
   }
   function fieldHtml(f) {
     const lbl = `<label>${esc(t(f.label))} ${f.required ? '<span class="req">*</span>' : ''}</label>`;
-    if (f.type === 'select') return `<div class="field">${lbl}<select name="${esc(f.key)}" ${f.required ? 'required' : ''}><option value="">${S.lang === 'en' ? 'Select...' : 'নির্বাচন...'}</option>${(f.options || []).map((o) => `<option value="${esc(o.label)}">${esc(o.label)}${typeof o.price === 'number' ? ' — ' + money(o.price) : ''}</option>`).join('')}</select></div>`;
+    if (f.type === 'select') return `<div class="field">${lbl}
+      <input type="hidden" name="${esc(f.key)}" value="">
+      <div class="pk-grid" data-pkg="${esc(f.key)}">${(f.options || []).map((o) => `<button type="button" class="pk" data-pk="${esc(f.key)}" data-v="${esc(o.label)}"><span class="pk-l">${esc(o.label)}</span>${typeof o.price === 'number' ? `<span class="pk-p">${money(o.price)}</span>` : ''}</button>`).join('')}</div></div>`;
     if (f.type === 'textarea') return `<div class="field">${lbl}<textarea name="${esc(f.key)}" ${f.required ? 'required' : ''} maxlength="500" placeholder="${esc(f.ph || '')}"></textarea></div>`;
     const type = f.type === 'number' ? 'number' : f.type === 'phone' ? 'tel' : 'text';
     const extra = f.type === 'number' ? `inputmode="numeric" ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''}` : f.type === 'phone' ? 'inputmode="numeric" maxlength="11"' : 'maxlength="300"';
