@@ -217,3 +217,63 @@ textarea{resize:vertical;min-height:84px}
 .dr-top .dr-back{order:0}
 .logo-img{width:36px;height:36px;border-radius:10px;object-fit:cover;background:#fff;flex:none}
 .auth-logo-img{width:72px;height:72px;border-radius:20px;object-fit:cover;margin:0 auto 12px;box-shadow:var(--shadow)}
+
+/* ======================= GLASS THEME (frosted / glassmorphism) ======================= */
+:root{--glass:rgba(255,255,255,.62);--glass-2:rgba(255,255,255,.78);--glass-brd:rgba(255,255,255,.65);--glass-sh:0 18px 44px -20px rgba(18,38,60,.45)}
+body{background:
+  radial-gradient(900px 520px at 8% -6%, color-mix(in srgb,var(--brand) 20%,transparent), transparent 60%),
+  radial-gradient(760px 480px at 108% 4%, color-mix(in srgb,var(--brand2) 22%,transparent), transparent 55%),
+  radial-gradient(700px 600px at 50% 112%, color-mix(in srgb,var(--brand) 14%,transparent), transparent 60%),
+  linear-gradient(180deg,#eef3f6,#e7edf1)}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(300px 300px at 80% 24%, color-mix(in srgb,var(--brand2) 30%,transparent), transparent 70%),
+             radial-gradient(260px 260px at 14% 62%, color-mix(in srgb,var(--brand) 26%,transparent), transparent 70%);
+  filter:blur(28px);opacity:.7}
+
+/* top bar — frosted */
+.top{background:var(--glass);-webkit-backdrop-filter:blur(20px) saturate(1.5);backdrop-filter:blur(20px) saturate(1.5);border-bottom:1px solid var(--glass-brd)}
+.icon-btn,.wallet{background:var(--glass-2);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-color:var(--glass-brd)}
+
+/* content cards — subtle glass so the coloured background glows through */
+.card{background:var(--glass-2);-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3);border-color:var(--glass-brd);box-shadow:var(--glass-sh)}
+.qs{background:var(--glass-2);-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3);border-color:var(--glass-brd);box-shadow:var(--glass-sh)}
+.notice{-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.hero{box-shadow:0 22px 44px -22px var(--brand),inset 0 1px 0 rgba(255,255,255,.25)}
+.hero::before{content:"";position:absolute;left:-30px;bottom:-40px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.08)}
+
+/* ---------- 2nd navigation: floating glass pill (bottom) ---------- */
+.tabbar{left:12px;right:12px;bottom:calc(12px + var(--safe-b));max-width:540px;margin:0 auto;border:1px solid var(--glass-brd);border-radius:30px;
+  background:var(--glass);-webkit-backdrop-filter:blur(24px) saturate(1.7);backdrop-filter:blur(24px) saturate(1.7);box-shadow:var(--glass-sh);padding-bottom:0}
+.tabbar-in{padding:9px 10px 8px}
+.tab{position:relative;border-radius:18px;transition:color .25s}
+.tab.on{color:var(--brand-d)}
+.tab.on::before{content:"";position:absolute;inset:-4px 2px -2px;z-index:-1;border-radius:18px;background:color-mix(in srgb,var(--brand) 20%,#fff);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 6px 14px -8px var(--brand);animation:tabpop .3s cubic-bezier(.2,1.3,.35,1)}
+@keyframes tabpop{from{transform:scale(.7);opacity:0}}
+.tab-add .fab{box-shadow:0 10px 24px -8px var(--brand),inset 0 1px 0 rgba(255,255,255,.4);border-color:var(--glass-2)}
+@media (min-width:600px){.tabbar{left:50%;right:auto;transform:translateX(-50%);width:540px;border-radius:30px}}
+
+/* ---------- curved glass sidebar (the 3-dot slide-in menu, video 2) ---------- */
+.drawer{width:86%;max-width:340px;background:var(--glass);-webkit-backdrop-filter:blur(30px) saturate(1.7);backdrop-filter:blur(30px) saturate(1.7);
+  border-right:1px solid var(--glass-brd);border-radius:0 34px 34px 0;box-shadow:30px 0 70px -30px rgba(18,38,60,.5),inset -1px 0 0 rgba(255,255,255,.3)}
+.dr-head{background:linear-gradient(160deg,color-mix(in srgb,var(--brand) 60%,transparent),color-mix(in srgb,var(--brand-d) 50%,transparent));backdrop-filter:blur(6px);border-radius:0 34px 0 0}
+.dr-back{background:rgba(255,255,255,.22);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.dr-body{padding:10px 12px 22px}
+.dr-sec{color:var(--brand-d);opacity:.85}
+.dr-item{border-radius:16px;transition:background .2s,transform .2s}
+.dr-item:active{transform:scale(.98)}
+.dr-item.on,.dr-item:hover{background:color-mix(in srgb,var(--brand) 12%,rgba(255,255,255,.5))}
+.dr-ic{background:linear-gradient(140deg,#1b2635,#0e1726);box-shadow:0 6px 14px -8px rgba(14,23,38,.7),inset 0 1px 0 rgba(255,255,255,.12)}
+.dr-ch .ic{color:color-mix(in srgb,var(--brand) 60%,#94a3b8)}
+/* promo / notice card inside the sidebar */
+.dr-card{margin:12px 6px 4px;padding:14px;border-radius:20px;background:linear-gradient(145deg,color-mix(in srgb,var(--brand) 85%,#000),var(--brand-d));color:#fff;position:relative;overflow:hidden;box-shadow:0 14px 30px -16px var(--brand)}
+.dr-card::after{content:"";position:absolute;right:-24px;top:-24px;width:90px;height:90px;border-radius:50%;background:rgba(255,255,255,.12)}
+.dr-card b{font-family:var(--disp);font-size:14px}
+.dr-card p{margin:4px 0 10px;font-size:12px;opacity:.85;line-height:1.5}
+.dr-card a{display:inline-flex;align-items:center;gap:6px;background:#fff;color:var(--brand-d);font-weight:700;font-size:12.5px;padding:7px 13px;border-radius:999px;text-decoration:none}
+.dr-card a .ic{width:15px;height:15px}
+
+/* keep glass blur even on phones for these few fixed layers (they are cheap) */
+@media (max-width:1180px){.top,.tabbar,.drawer,.card,.qs{-webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4)}}
+@supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
+  .top,.icon-btn,.wallet,.card,.qs{background:#fff}.tabbar,.drawer{background:#fbfdfe}
+}

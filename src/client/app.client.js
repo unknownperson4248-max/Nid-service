@@ -152,7 +152,8 @@
       <div class="dr-body">
         ${nav.map(([r, ic, lbl]) => drItem(r, ic, lbl, S.route === r)).join('')}
         ${svcHtml}
-        <button class="dr-item" data-act="logout" style="color:var(--bad);margin-top:8px"><span class="dr-ic" style="background:var(--bad)">${icon('logout')}</span><span class="dr-l">${u('logout')}</span></button>
+        <div class="dr-card"><b>${esc(u('walletBalance'))}: ${money(S.user.balance)}</b><p>${esc(u('depositNote'))}</p><a data-nav="deposit">${icon('plus')}${esc(u('addMoney'))}</a></div>
+        <button class="dr-item" data-act="logout" style="color:var(--bad);margin-top:6px"><span class="dr-ic" style="background:var(--bad)">${icon('logout')}</span><span class="dr-l">${u('logout')}</span></button>
       </div></aside>`;
   }
 
