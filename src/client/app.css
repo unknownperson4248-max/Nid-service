@@ -202,3 +202,14 @@ textarea{resize:vertical;min-height:84px}
 .copy-box button{margin-left:auto;color:var(--brand);background:none;border:0;font-weight:700;font-size:13px}
 .toast{position:fixed;left:50%;bottom:calc(84px + var(--safe-b));transform:translateX(-50%);background:#0e1726;color:#fff;padding:11px 18px;border-radius:999px;font-size:13.5px;font-weight:600;z-index:90;box-shadow:0 10px 24px rgba(0,0,0,.3);animation:up .25s}
 @media (min-width:600px){.page{padding-bottom:40px}.tabbar{max-width:560px;left:50%;transform:translateX(-50%);border-radius:18px 18px 0 0;border:1px solid var(--line)}}
+
+/* drawer back + image tiles + service banner */
+.dr-top{display:flex;align-items:center;gap:10px}
+.dr-top .logo{margin-right:auto;min-width:0}
+.dr-back{width:36px;height:36px;border-radius:11px;border:0;background:rgba(255,255,255,.2);color:#fff;display:grid;place-items:center;flex:none}
+.dr-back .ic{width:20px;height:20px}
+.dr-ic.img,.qs-ic.img{overflow:hidden;background:#eef2f5!important;padding:0}
+.dr-ic.img img,.qs-ic.img img{width:100%;height:100%;object-fit:cover}
+.svc-banner{border-radius:var(--r);overflow:hidden;margin-bottom:12px;border:1px solid var(--line);box-shadow:var(--shadow)}
+.svc-banner img{width:100%;max-height:200px;object-fit:cover}
+.dr-sec{text-transform:none;letter-spacing:.02em;font-size:12.5px}

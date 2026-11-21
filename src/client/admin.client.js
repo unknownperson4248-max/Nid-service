@@ -123,41 +123,53 @@
   const catName = (id) => { const c = S.cats.find((x) => x.id === id); return c ? tl(c.name) : id || '-'; };
 
   let editing = null; // service being edited (deep copy)
-  function newService() { editing = { id: 'svc' + Date.now().toString(36), cat: (S.cats[0] || {}).id || 'topup', icon: 'bolt', color: '#0f766e', active: true, featured: false, price: 0, name: { bn: '', en: '' }, sub: { bn: '', en: '' }, note: { bn: '', en: '' }, fields: [] }; svcModal(); }
+  function newService() { editing = { id: 'svc' + Date.now().toString(36), cat: (S.cats[0] || {}).id || 'topup', icon: 'bolt', color: '#0f766e', active: true, featured: false, price: 0, name: '', sub: '', note: '', fields: [] }; svcModal(); }
   function editService(id) { const s = S.services.find((x) => x.id === id); editing = JSON.parse(JSON.stringify(s)); if (!editing.fields) editing.fields = []; svcModal(); }
   function svcModal() {
     const s = editing;
-    modal(s.name.bn || s.name.en ? 'Edit service' : 'New service', `
-      <div class="grid2">
-        <div class="field"><label>Name (বাংলা) <span class="req">*</span></label><input id="f-name-bn" value="${esc(s.name.bn)}"></div>
-        <div class="field"><label>Name (English)</label><input id="f-name-en" value="${esc(s.name.en)}"></div>
-        <div class="field"><label>Sub (বাংলা)</label><input id="f-sub-bn" value="${esc(s.sub.bn)}"></div>
-        <div class="field"><label>Sub (English)</label><input id="f-sub-en" value="${esc(s.sub.en)}"></div>
-      </div>
-      <div class="field"><label>Note / instruction (বাংলা)</label><textarea id="f-note-bn">${esc(s.note.bn)}</textarea></div>
-      <div class="field"><label>Note / instruction (English)</label><textarea id="f-note-en">${esc(s.note.en)}</textarea></div>
+    modal(tl(s.name) ? 'Edit product' : 'New product', `
+      <div class="field"><label>Product name <span class="req">*</span></label><input id="f-name" value="${esc(tl(s.name))}" placeholder="e.g. Free Fire Diamond"></div>
+      <div class="field"><label>Short line</label><input id="f-sub" value="${esc(tl(s.sub))}" placeholder="e.g. Player ID diye top-up"></div>
+      <div class="field"><label>Note / instruction</label><textarea id="f-note">${esc(tl(s.note))}</textarea></div>
+      <div class="field"><label>Product image (optional)</label>
+        <div class="flex"><div id="f-imgprev" class="iconbox" style="width:54px;height:54px;background:#eef2f5;overflow:hidden">${s.image ? `<img src="${esc(s.image)}" style="width:100%;height:100%;object-fit:cover">` : icon('eye')}</div>
+          <button type="button" class="btn btn-ghost btn-sm" id="f-imgbtn">${icon('plus')}Upload image</button>
+          ${s.image ? `<button type="button" class="btn btn-bad btn-sm" id="f-imgdel">Remove</button>` : ''}</div>
+        <input type="file" id="f-imgfile" accept="image/*" style="display:none"><div class="muted" style="font-size:11px;margin-top:4px">Shows on the product box and page. Max 2MB.</div></div>
       <div class="grid2">
         <div class="field"><label>Category</label><select id="f-cat">${S.cats.map((c) => `<option value="${esc(c.id)}" ${s.cat === c.id ? 'selected' : ''}>${esc(tl(c.name))}</option>`).join('')}</select></div>
-        <div class="field"><label>Icon</label><select id="f-icon">${['bolt', 'diamond', 'crown', 'thumb', 'phone', 'wallet', 'box', 'grid', 'money', 'eye'].map((n) => `<option value="${n}" ${s.icon === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+        <div class="field"><label>Icon (if no image)</label><select id="f-icon">${['bolt', 'diamond', 'crown', 'thumb', 'phone', 'wallet', 'box', 'grid', 'money', 'eye'].map((n) => `<option value="${n}" ${s.icon === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
         <div class="field"><label>Color</label><input id="f-color" type="color" value="${esc(s.color || '#0f766e')}" style="height:42px;padding:3px"></div>
-        <div class="field"><label>Base price (৳)</label><input id="f-price" type="number" value="${s.price || 0}"><div class="muted" style="font-size:11px">0 = price from field options</div></div>
+        <div class="field"><label>Base price (৳)</label><input id="f-price" type="number" value="${s.price || 0}"><div class="muted" style="font-size:11px">0 = price from options below</div></div>
       </div>
       <div class="flex" style="margin:4px 0 14px">
         <label class="flex" style="gap:6px"><input type="checkbox" id="f-active" ${s.active ? 'checked' : ''} style="width:auto"> Active</label>
-        <label class="flex" style="gap:6px"><input type="checkbox" id="f-featured" ${s.featured ? 'checked' : ''} style="width:auto"> Featured (home)</label>
+        <label class="flex" style="gap:6px"><input type="checkbox" id="f-featured" ${s.featured ? 'checked' : ''} style="width:auto"> Featured</label>
       </div>
-      <div class="flex" style="justify-content:space-between;margin-bottom:8px"><b style="font-family:var(--disp)">Form fields (boxes)</b><button class="btn btn-sm" data-act="add-field">${icon('plus')}Add box</button></div>
+      <div class="flex" style="justify-content:space-between;margin-bottom:8px"><b style="font-family:var(--disp)">Order boxes (fields)</b><button class="btn btn-sm" data-act="add-field">${icon('plus')}Add box</button></div>
       <div id="fields-wrap">${s.fields.map(fieldEditor).join('')}</div>`,
-      `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="svc-save">${icon('check')}Save service</button>`);
+      `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="svc-save">${icon('check')}Save product</button>`);
     $('#svc-save').addEventListener('click', saveService);
+    $('#f-imgbtn').addEventListener('click', () => $('#f-imgfile').click());
+    $('#f-imgfile').addEventListener('change', uploadImage);
+    const del = $('#f-imgdel'); if (del) del.addEventListener('click', () => { readFieldsFromDom(); syncSvcText(); editing.image = ''; svcModal(); });
+  }
+  function syncSvcText() { const g = (id) => { const el = $(id); return el ? el.value : undefined; }; const n = g('#f-name'); if (n !== undefined) editing.name = n.trim(); const sb = g('#f-sub'); if (sb !== undefined) editing.sub = sb.trim(); const no = g('#f-note'); if (no !== undefined) editing.note = no.trim(); const cat = g('#f-cat'); if (cat !== undefined) editing.cat = cat; const ic = g('#f-icon'); if (ic !== undefined) editing.icon = ic; const col = g('#f-color'); if (col !== undefined) editing.color = col; const pr = g('#f-price'); if (pr !== undefined) editing.price = Number(pr) || 0; const ac = $('#f-active'); if (ac) editing.active = ac.checked; const fe = $('#f-featured'); if (fe) editing.featured = fe.checked; }
+  async function uploadImage(e) {
+    const file = e.target.files[0]; if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast('Image too big (max 2MB)'); return; }
+    readFieldsFromDom(); syncSvcText();
+    const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
+    toast('Uploading...');
+    const r = await api('/api/admin/upload', { dataUrl });
+    if (r.ok) { editing.image = r.path; svcModal(); } else toast('Upload failed');
   }
   function fieldEditor(f, i) {
     return `<div class="fieldrow" data-fi="${i}">
       <div class="flex"><span class="pill">#${i + 1}</span><b style="flex:1">${esc(tl(f.label)) || '(field)'}</b><button class="btn btn-bad btn-sm" data-del-field="${i}">${icon('trash')}</button></div>
       <div class="grid2" style="margin-top:8px">
-        <div class="field"><label>Label (বাংলা)</label><input data-ff="${i}:label.bn" value="${esc(f.label.bn || '')}"></div>
-        <div class="field"><label>Label (English)</label><input data-ff="${i}:label.en" value="${esc(f.label.en || '')}"></div>
-        <div class="field"><label>Key (english, no space)</label><input data-ff="${i}:key" value="${esc(f.key || '')}"></div>
+        <div class="field"><label>Box label</label><input data-ff="${i}:label" value="${esc(tl(f.label))}" placeholder="e.g. Player ID"></div>
+        <div class="field"><label>Key (english, no space)</label><input data-ff="${i}:key" value="${esc(f.key || '')}" placeholder="auto"></div>
         <div class="field"><label>Type</label><select data-ff="${i}:type">${['text', 'number', 'phone', 'select', 'textarea', 'date'].map((tp) => `<option value="${tp}" ${f.type === tp ? 'selected' : ''}>${tp}</option>`).join('')}</select></div>
         <div class="field"><label>Placeholder</label><input data-ff="${i}:ph" value="${esc(f.ph || '')}"></div>
         <div class="field"><label class="flex" style="gap:6px;margin-top:24px"><input type="checkbox" data-ff="${i}:required" ${f.required ? 'checked' : ''} style="width:auto"> Required</label></div>
@@ -174,8 +186,7 @@
       const [i, pathRaw] = el.dataset.ff.split(':'); const path = pathRaw; const f = editing.fields[+i]; if (!f) return;
       let val = el.type === 'checkbox' ? el.checked : el.value;
       if (path === 'min' || path === 'max') val = el.value === '' ? null : Number(el.value);
-      if (path.startsWith('label.')) { f.label = f.label || {}; f.label[path.split('.')[1]] = el.value; }
-      else f[path] = val;
+      f[path] = val;
     });
     document.querySelectorAll('[data-fo]').forEach((el) => {
       const [fi, oi, key] = el.dataset.fo.split(':'); const f = editing.fields[+fi]; if (!f || !f.options || !f.options[+oi]) return;
@@ -183,15 +194,10 @@
     });
   }
   async function saveService() {
-    readFieldsFromDom();
+    readFieldsFromDom(); syncSvcText();
     const s = editing;
-    s.name = { bn: $('#f-name-bn').value.trim(), en: $('#f-name-en').value.trim() };
-    s.sub = { bn: $('#f-sub-bn').value.trim(), en: $('#f-sub-en').value.trim() };
-    s.note = { bn: $('#f-note-bn').value.trim(), en: $('#f-note-en').value.trim() };
-    s.cat = $('#f-cat').value; s.icon = $('#f-icon').value; s.color = $('#f-color').value;
-    s.price = Number($('#f-price').value) || 0; s.active = $('#f-active').checked; s.featured = $('#f-featured').checked;
-    if (!s.name.bn && !s.name.en) { toast('Name required'); return; }
-    s.fields = (s.fields || []).map((f) => { if (!f.key) f.key = (f.label.en || f.label.bn || 'f').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'f' + Math.random().toString(36).slice(2, 5); if (f.type === 'select') f.options = (f.options || []).filter((o) => o.label); return f; });
+    if (!tl(s.name)) { toast('Name required'); return; }
+    s.fields = (s.fields || []).map((f) => { const lbl = tl(f.label); if (!f.key) f.key = (lbl || 'f').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'f' + Math.random().toString(36).slice(2, 5); if (f.type === 'select') f.options = (f.options || []).filter((o) => o.label); return f; });
     const list = S.services.slice(); const idx = list.findIndex((x) => x.id === s.id);
     if (idx >= 0) list[idx] = s; else list.push(s);
     const r = await api('/api/admin/services', { services: list });
@@ -203,11 +209,11 @@
     modal('Categories', `<div id="cats-wrap">${S.cats.map(catRow).join('')}</div><button class="btn btn-ghost btn-sm" data-act="add-cat">${icon('plus')}Add category</button>`,
       `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="cats-save">${icon('check')}Save</button>`);
     $('#cats-save').addEventListener('click', async () => {
-      const cats = [...document.querySelectorAll('[data-cat]')].map((el) => ({ id: el.querySelector('[data-ck]').value.trim() || 'c' + Math.random().toString(36).slice(2, 6), name: { bn: el.querySelector('[data-cbn]').value.trim(), en: el.querySelector('[data-cen]').value.trim() } })).filter((c) => c.name.bn || c.name.en);
+      const cats = [...document.querySelectorAll('[data-cat]')].map((el) => { const nm = el.querySelector('[data-cname]').value.trim(); return { id: el.querySelector('[data-ck]').value.trim() || nm.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'c' + Math.random().toString(36).slice(2, 6), name: nm }; }).filter((c) => c.name);
       const r = await api('/api/admin/cats', { cats }); if (r.ok) { S.cats = cats; toast('Saved'); closeModal(); vServices(); } else toast('Error');
     });
   }
-  const catRow = (c) => `<div class="fieldrow" data-cat><div class="grid2"><div class="field"><label>ID</label><input data-ck value="${esc(c.id)}"></div><div class="field"><label>Name (বাংলা)</label><input data-cbn value="${esc(c.name.bn || '')}"></div><div class="field"><label>Name (English)</label><input data-cen value="${esc(c.name.en || '')}"></div></div></div>`;
+  const catRow = (c) => `<div class="fieldrow" data-cat><div class="grid2"><div class="field"><label>Category name</label><input data-cname value="${esc(tl(c.name))}" placeholder="e.g. Game Top-Up"></div><div class="field"><label>ID (english)</label><input data-ck value="${esc(c.id)}" placeholder="auto"></div></div></div>`;
 
   /* ---------- users ---------- */
   async function vUsers() {
@@ -238,11 +244,11 @@
     const c = $('#content'); const r = await api('/api/admin/notices'); notices = r.notices || [];
     c.innerHTML = `<div class="flex" style="margin-bottom:14px"><button class="btn" data-act="add-notice">${icon('plus')}Add notice</button></div><div id="nlist" class="row-wrap">${renderNotices()}</div>`;
   }
-  const renderNotices = () => notices.map((n, i) => `<div class="item"><div class="grid2"><div class="field"><label>Title (বাংলা)</label><input data-nf="${i}:title.bn" value="${esc(n.title.bn || '')}"></div><div class="field"><label>Title (English)</label><input data-nf="${i}:title.en" value="${esc(n.title.en || '')}"></div></div>
-    <div class="field"><label>Body (বাংলা)</label><textarea data-nf="${i}:body.bn">${esc(n.body.bn || '')}</textarea></div><div class="field"><label>Body (English)</label><textarea data-nf="${i}:body.en">${esc(n.body.en || '')}</textarea></div>
+  const renderNotices = () => notices.map((n, i) => `<div class="item"><div class="field"><label>Title</label><input data-nf="${i}:title" value="${esc(tl(n.title))}"></div>
+    <div class="field"><label>Message</label><textarea data-nf="${i}:body">${esc(tl(n.body))}</textarea></div>
     <div class="flex" style="justify-content:space-between"><select data-nf="${i}:type" style="max-width:160px"><option value="info" ${n.type === 'info' ? 'selected' : ''}>info</option><option value="urgent" ${n.type === 'urgent' ? 'selected' : ''}>urgent</option></select><button class="btn btn-bad btn-sm" data-del-notice="${i}">${icon('trash')}Delete</button></div></div>`).join('') || '<div class="empty">No notices</div>';
   function saveNotices() {
-    document.querySelectorAll('[data-nf]').forEach((el) => { const [i, path] = el.dataset.nf.split(':'); const n = notices[+i]; if (!n) return; if (path.includes('.')) { const [a, b] = path.split('.'); n[a] = n[a] || {}; n[a][b] = el.value; } else n[path] = el.value; });
+    document.querySelectorAll('[data-nf]').forEach((el) => { const [i, path] = el.dataset.nf.split(':'); const n = notices[+i]; if (!n) return; n[path] = el.value; });
   }
 
   /* ---------- settings ---------- */
@@ -251,7 +257,7 @@
     const r = await api('/api/admin/settings'); const s = r.settings || {};
     c.innerHTML = `<div class="card"><div class="card-h">${icon('cog')}General</div><div class="card-b">
       <div class="grid2"><div class="field"><label>Brand name A</label><input id="s-a" value="${esc(s.brandA || '')}"></div><div class="field"><label>Brand name B (colored)</label><input id="s-b" value="${esc(s.brandB || '')}"></div>
-      <div class="field"><label>Tagline (বাংলা)</label><input id="s-tbn" value="${esc((s.tagline || {}).bn || '')}"></div><div class="field"><label>Tagline (English)</label><input id="s-ten" value="${esc((s.tagline || {}).en || '')}"></div>
+      <div class="field"><label>Tagline</label><input id="s-tbn" value="${esc(tl(s.tagline))}"></div><div></div>
       <div class="field"><label>Currency</label><input id="s-cur" value="${esc(s.currency || '৳')}" maxlength="3"></div><div class="field"><label>Min deposit (৳)</label><input id="s-min" type="number" value="${s.minDeposit || 20}"></div>
       <div class="field"><label>Referral bonus (৳)</label><input id="s-ref" type="number" value="${s.referralBonus || 0}"></div><div class="field"><label>WhatsApp (support)</label><input id="s-wa" value="${esc(s.whatsapp || '')}" placeholder="8801XXXXXXXXX"></div></div>
     </div></div>
@@ -262,7 +268,7 @@
   const methodRow = (m) => `<div class="fieldrow" data-method><div class="grid2"><div class="field"><label>Label</label><input data-ml value="${esc(m.label || '')}"></div><div class="field"><label>Number</label><input data-mn value="${esc(m.number || '')}" placeholder="01XXXXXXXXX"></div><div class="field"><label>Type</label><input data-mt value="${esc(m.type || 'Personal')}"></div><div class="field"><label>Color</label><input data-mc type="color" value="${esc(m.color || '#0f766e')}" style="height:42px;padding:3px"></div></div><div style="text-align:right"><button class="btn btn-bad btn-sm" data-del-method>${icon('trash')}</button></div></div>`;
   async function saveSettings() {
     const methods = [...document.querySelectorAll('[data-method]')].map((el) => ({ id: (el.querySelector('[data-ml]').value || 'm').toLowerCase().replace(/[^a-z0-9]/g, ''), label: el.querySelector('[data-ml]').value.trim(), number: el.querySelector('[data-mn]').value.trim(), type: el.querySelector('[data-mt]').value.trim(), color: el.querySelector('[data-mc]').value })).filter((m) => m.label);
-    const settings = { brandA: $('#s-a').value.trim(), brandB: $('#s-b').value.trim(), tagline: { bn: $('#s-tbn').value.trim(), en: $('#s-ten').value.trim() }, currency: $('#s-cur').value.trim() || '৳', minDeposit: Number($('#s-min').value) || 20, referralBonus: Number($('#s-ref').value) || 0, whatsapp: $('#s-wa').value.replace(/[^0-9]/g, ''), depositMethods: methods };
+    const settings = { brandA: $('#s-a').value.trim(), brandB: $('#s-b').value.trim(), tagline: $('#s-tbn').value.trim(), currency: $('#s-cur').value.trim() || '৳', minDeposit: Number($('#s-min').value) || 20, referralBonus: Number($('#s-ref').value) || 0, whatsapp: $('#s-wa').value.replace(/[^0-9]/g, ''), depositMethods: methods };
     const r = await api('/api/admin/settings', { settings }); if (r.ok) toast('Saved ✓'); else toast('Error');
   }
 
@@ -295,7 +301,7 @@
     const delOpt = e.target.closest('[data-del-opt]'); if (delOpt) { readFieldsFromDom(); const [fi, oi] = delOpt.dataset.delOpt.split(':'); editing.fields[+fi].options.splice(+oi, 1); $('#fields-wrap').innerHTML = editing.fields.map(fieldEditor).join(''); return; }
     if (e.target.closest('[data-act="add-cat"]')) { const w = $('#cats-wrap'); const div = document.createElement('div'); div.innerHTML = catRow({ id: '', name: { bn: '', en: '' } }); w.appendChild(div.firstChild); return; }
     const user = e.target.closest('[data-user]'); if (user) { try { userModal(JSON.parse(user.dataset.user)); } catch (x) {} return; }
-    if (e.target.closest('[data-act="add-notice"]')) { saveNotices(); notices.unshift({ id: 'n' + Date.now(), type: 'info', ts: Date.now(), title: { bn: '', en: '' }, body: { bn: '', en: '' } }); const nl = $('#nlist'); if (nl) nl.innerHTML = renderNotices(); saveNoticesToServer(); return; }
+    if (e.target.closest('[data-act="add-notice"]')) { saveNotices(); notices.unshift({ id: 'n' + Date.now(), type: 'info', ts: Date.now(), title: '', body: '' }); const nl = $('#nlist'); if (nl) nl.innerHTML = renderNotices(); saveNoticesToServer(); return; }
     const delN = e.target.closest('[data-del-notice]'); if (delN) { saveNotices(); notices.splice(+delN.dataset.delNotice, 1); $('#nlist').innerHTML = renderNotices(); saveNoticesToServer(); return; }
     if (e.target.closest('[data-act="add-method"]')) { const m = $('#methods'); const div = document.createElement('div'); div.innerHTML = methodRow({ label: '', number: '', type: 'Personal', color: '#0f766e' }); m.appendChild(div.firstChild); return; }
     const delM = e.target.closest('[data-del-method]'); if (delM) { delM.closest('[data-method]').remove(); return; }

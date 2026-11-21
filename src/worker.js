@@ -322,6 +322,17 @@ async function handleAdmin(req, env, url, path, u) {
     return json({ ok: true });
   }
 
+  if (path === '/api/admin/upload' && req.method === 'POST') {
+    let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
+    const m = /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(String(b.dataUrl || ''));
+    if (!m) return json({ ok: false, error: 'type' }, 400);
+    const bin = Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0));
+    if (bin.byteLength > 2 * 1024 * 1024) return json({ ok: false, error: 'big' }, 400);
+    const id = rid(16);
+    await env.DATA.put('media:' + id, bin, { metadata: { type: m[1] } });
+    return json({ ok: true, path: '/img/' + id });
+  }
+
   if (path === '/api/admin/services') {
     if (req.method === 'POST') {
       let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
@@ -409,6 +420,14 @@ export default {
       if (path === '/admin' || path === '/admin/')
         return text(ADMIN_HTML.replace(/\{\{V\}\}/g, VERSION), 'text/html; charset=utf-8', 'no-store', 200, { 'x-robots-tag': 'noindex' });
       if (path === '/robots.txt') return text('User-agent: *\nDisallow: /admin\n', 'text/plain', 'public, max-age=86400');
+      if (path.startsWith('/img/')) {
+        const id = path.slice(5);
+        if (/^[a-z0-9]{10,24}$/.test(id)) {
+          const { value, metadata } = await env.DATA.getWithMetadata('media:' + id, { type: 'arrayBuffer' });
+          if (value) return new Response(value, { headers: { 'content-type': (metadata && metadata.type) || 'image/jpeg', 'cache-control': 'public, max-age=31536000, immutable', ...BASE_HEADERS } });
+        }
+        return new Response('Not found', { status: 404 });
+      }
       // SPA: everything else serves the app shell
       return text(APP_HTML.replace(/\{\{V\}\}/g, VERSION), 'text/html; charset=utf-8', 'no-store');
     } catch (e) {

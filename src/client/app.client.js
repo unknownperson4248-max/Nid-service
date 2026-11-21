@@ -92,7 +92,6 @@
       </form>
       <p style="text-align:center;margin-top:16px;color:var(--muted);font-size:13.5px">${authMode === 'login' ? u('noAcc') : u('haveAcc')}
         <a href="#" data-am="${authMode === 'login' ? 'register' : 'login'}" style="color:var(--brand);font-weight:700">${authMode === 'login' ? u('register') : u('login')}</a></p>
-      <div style="text-align:center;margin-top:18px">${langSeg()}</div>
     </div></div>`;
   }
   const langSeg = () => `<span class="lang-seg"><button data-lang="bn" class="${S.lang === 'bn' ? 'on' : ''}">বাংলা</button><button data-lang="en" class="${S.lang === 'en' ? 'on' : ''}">EN</button></span>`;
@@ -137,18 +136,23 @@
     </div></nav>`;
   }
   function drawer() {
-    const drItem = (r, ic, lbl, on, color) => `<button class="dr-item ${on ? 'on' : ''}" data-nav="${r}"><span class="dr-ic" ${color ? `style="background:${color}"` : ''}>${icon(ic)}</span><span class="dr-l">${esc(lbl)}</span><span class="dr-ch">${icon('right')}</span></button>`;
-    const svcItems = S.services.filter((s) => s.active).map((s) => drItem('service/' + s.id, s.icon || 'bolt', t(s.name), false, svcColor(s))).join('');
-    const nav = [['home', 'home', u('dashboard')], ['deposit', 'wallet', u('recharge')], ['orders', 'box', u('orderHistory')], ['referrals', 'gift', u('referrals')], ['profile', 'user', u('profile')]];
+    const drItem = (r, ic, lbl, on, color, img) => `<button class="dr-item ${on ? 'on' : ''}" data-nav="${r}"><span class="dr-ic ${img ? 'img' : ''}" ${!img && color ? `style="background:${color}"` : ''}>${img ? `<img src="${esc(img)}" alt="">` : icon(ic)}</span><span class="dr-l">${esc(lbl)}</span><span class="dr-ch">${icon('right')}</span></button>`;
+    const nav = [['deposit', 'wallet', u('recharge')], ['orders', 'box', u('orderHistory')], ['referrals', 'gift', u('referrals')], ['profile', 'user', u('profile')]];
+    // services grouped: category header -> its products
+    const active = S.services.filter((s) => s.active);
+    const cats = (S.cats || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    let svcHtml = '';
+    cats.forEach((c) => { const items = active.filter((s) => (s.cat || '') === c.id); if (items.length) svcHtml += `<div class="dr-sec">${esc(t(c.name))}</div>` + items.map((s) => drItem('service/' + s.id, s.icon || 'bolt', t(s.name), false, svcColor(s), s.image)).join(''); });
+    const uncat = active.filter((s) => !cats.some((c) => c.id === (s.cat || '')));
+    if (uncat.length) svcHtml += `<div class="dr-sec">${u('services')}</div>` + uncat.map((s) => drItem('service/' + s.id, s.icon || 'bolt', t(s.name), false, svcColor(s), s.image)).join('');
     return `<aside class="drawer ${S.drawer ? 'on' : ''}">
-      <div class="dr-head"><div class="logo"><span class="logo-mark">${icon('bolt')}</span><span><span class="logo-t">${esc(S.settings.brandA)} <em>${esc(S.settings.brandB)}</em></span></span></div>
+      <div class="dr-head"><div class="dr-top"><div class="logo"><span class="logo-mark">${icon('bolt')}</span><span class="logo-t">${esc(S.settings.brandA)} <em>${esc(S.settings.brandB)}</em></span></div>
+        <button class="dr-back" data-act="drawer-close" aria-label="back">${icon('left')}</button></div>
         <div class="dr-user"><span class="avatar">${initials(S.user.name)}</span><span><b>${esc(S.user.name)}</b><br><small>${money(S.user.balance)} • ${esc(S.user.phone)}</small></span></div></div>
       <div class="dr-body">
         ${nav.map(([r, ic, lbl]) => drItem(r, ic, lbl, S.route === r)).join('')}
-        <div class="dr-sec">${u('services')}</div>
-        ${svcItems}
-        <div style="padding:14px 12px">${langSeg()}</div>
-        <button class="dr-item" data-act="logout" style="color:var(--bad)"><span class="dr-ic" style="background:var(--bad)">${icon('logout')}</span><span class="dr-l">${u('logout')}</span></button>
+        ${svcHtml}
+        <button class="dr-item" data-act="logout" style="color:var(--bad);margin-top:8px"><span class="dr-ic" style="background:var(--bad)">${icon('logout')}</span><span class="dr-l">${u('logout')}</span></button>
       </div></aside>`;
   }
 
@@ -174,27 +178,23 @@
     const uncat = active.filter((s) => !cats.some((c) => c.id === (s.cat || ''))); if (uncat.length) catSections += `<div class="sec-h">${icon('grid')}${u('services')}</div><div class="qgrid">${uncat.map(qsCard).join('')}</div>`;
     if (!active.length) catSections = `<div class="sec-h">${icon('bolt')}${u('quickServices')}</div><div class="qgrid">${emptyBox(u('services'))}</div>`;
     v.innerHTML = `
-      <div class="hero"><div class="hero-lbl">${u('walletBalance')}</div><div class="hero-bal">${money(S.user.balance)}</div>
-        <div class="hero-row"><button class="hero-btn solid" data-nav="deposit">${icon('plus')}${u('addMoney')}</button>
-          <button class="hero-btn" data-nav="orders">${icon('box')}${u('orders')}</button></div></div>
+      <div class="hero"><div class="hero-lbl">${u('walletBalance')}</div><div class="hero-bal">${money(S.user.balance)}</div></div>
 
       ${S.notices.length ? `<div class="sec-h">${icon('bell')}${u('noticeBoard')}</div>
       <div>${S.notices.map((n) => `<div class="notice ${n.type === 'urgent' ? 'urgent' : ''}">
-        <div class="notice-h">${icon(n.type === 'urgent' ? 'alert' : 'info')}<span>${esc(t(n.title))}</span><time>${new Date(n.ts).toLocaleDateString('en-GB')}</time></div>
+        <div class="notice-h">${icon(n.type === 'urgent' ? 'alert' : 'info')}<span>${esc(t(n.title))}</span></div>
         <div class="notice-b">${esc(t(n.body))}</div></div>`).join('')}</div>` : ''}
 
       ${catSections}
-
-      <div class="sec-h">${icon('tag')}${u('priceList')}</div>
-      <div class="card">${priceList()}</div>
 
       <div class="sec-h">${icon('clock')}${u('recentOrders')}<span class="live-dot"><i></i>LIVE</span></div>
       <div class="card">${S.live.length ? S.live.map(liveRow).join('') : emptyBox(u('noOrders'))}</div>
 
       <div style="height:10px"></div>`;
   }
+  const svcIcon = (s, cls) => s.image ? `<span class="${cls} img"><img src="${esc(s.image)}" alt="" loading="lazy"></span>` : `<span class="${cls}" style="background:linear-gradient(135deg,${svcColor(s)},${svcColor(s)}cc)">${icon(s.icon || 'bolt')}</span>`;
   const qsCard = (s) => `<button class="qs" data-nav="service/${esc(s.id)}"><span class="arrow">${icon('right')}</span>
-    <span class="qs-ic" style="background:linear-gradient(135deg,${svcColor(s)},${svcColor(s)}cc)">${icon(s.icon || 'bolt')}</span>
+    ${svcIcon(s, 'qs-ic')}
     <b>${esc(t(s.name))}</b><small>${esc(t(s.sub))}</small><span class="from">${u('from')} ${money(svcMinPrice(s))}</span></button>`;
   function svcMinPrice(s) {
     let base = +s.price || 0; const prices = [];
@@ -227,6 +227,7 @@
     if (!s) { v.innerHTML = emptyBox(u('services')); return; }
     v.innerHTML = `
       <div class="ph"><button class="back" data-back>${icon('left')}</button><div><h2>${esc(t(s.name))}</h2><div class="sub">${esc(t(s.sub))}</div></div></div>
+      ${s.image ? `<div class="svc-banner"><img src="${esc(s.image)}" alt="${esc(t(s.name))}"></div>` : ''}
       <div class="svc-hero" style="background:linear-gradient(135deg,${svcColor(s)},${svcColor(s)}cc)">
         <span class="qs-ic">${icon(s.icon || 'bolt')}</span><span><b>${esc(t(s.name))}</b><br><small>${esc(t(s.sub))}</small></span></div>
       ${t(s.note) ? `<div class="notice"><div class="notice-h">${icon('info')}<span>${u('details')}</span></div><div class="notice-b">${esc(t(s.note))}</div></div>` : ''}
@@ -341,7 +342,6 @@
         <div class="field"><label>${u('newPass')} <span class="hint">(${S.lang === 'en' ? 'leave blank to keep' : 'না বদলালে খালি রাখুন'})</span></label><input name="password" type="password" minlength="6" maxlength="100" autocomplete="new-password"></div>
         <button class="btn" type="submit">${icon('check')}${u('save')}</button>
       </form>
-      <div style="margin:14px 0">${langSeg()}</div>
       ${S.settings.whatsapp ? `<a class="btn btn-ghost" href="https://wa.me/${esc(S.settings.whatsapp)}" target="_blank" rel="noopener">${icon('whatsapp')}${u('support')}</a>` : ''}
       <button class="btn btn-ghost" data-act="logout" style="color:var(--bad);margin-top:12px">${icon('logout')}${u('logout')}</button><div style="height:10px"></div>`;
     $('#pf-form').addEventListener('submit', async (e) => {
