@@ -58,7 +58,8 @@
   };
   let S = { user: null, settings: null, services: [], cats: [], notices: [], live: [], lang: localStorage.getItem('lang') || 'bn', route: 'home', param: '', drawer: false };
   const t = (o) => (o == null ? '' : typeof o === 'string' ? o : o[S.lang] || o.bn || o.en || '');
-  const u = (k) => { const e = T[k]; return e ? (S.lang === 'en' ? e.en : e.bn) : k; };
+  const u = (k) => { const o = S.settings && S.settings.texts && S.settings.texts[k]; if (o) return o; const e = T[k]; return e ? (S.lang === 'en' ? e.en : e.bn) : k; };
+  const L = (g, k) => !(S.settings && S.settings.layout && S.settings.layout[g] && S.settings.layout[g][k] === false);
   const money = (n) => `${(S.settings && S.settings.currency) || '৳'}${Math.round(+n || 0).toLocaleString('en-US')}`;
   const initials = (n) => String(n || '?').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
   const ago = (ts) => { const s = Math.floor((Date.now() - ts) / 1000); if (s < 60) return S.lang === 'en' ? 'just now' : 'এইমাত্র'; const m = Math.floor(s / 60); if (m < 60) return m + (S.lang === 'en' ? ' min ago' : ' মিনিট আগে'); const h = Math.floor(m / 60); if (h < 24) return h + (S.lang === 'en' ? ' hr ago' : ' ঘণ্টা আগে'); return Math.floor(h / 24) + (S.lang === 'en' ? ' d ago' : ' দিন আগে'); };
@@ -126,18 +127,18 @@
     renderRoute();
   }
   function tabbar() {
-    const items = [['home', 'home', u('home')], ['orders', 'box', u('orders')]];
-    const items2 = [['referrals', 'gift', u('referrals')], ['profile', 'user', u('profile')]];
+    const items = [['home', 'home', u('home')], ['orders', 'box', u('orders'), 'orders']].filter((x) => !x[3] || L('nav', x[3]));
+    const items2 = [['referrals', 'gift', u('referrals'), 'referrals'], ['profile', 'user', u('profile'), 'profile']].filter((x) => L('nav', x[3]));
     const tab = ([r, ic, lbl]) => `<button class="tab ${S.route === r ? 'on' : ''}" data-nav="${r}">${icon(ic)}<span>${lbl}</span></button>`;
     return `<nav class="tabbar"><div class="tabbar-in">
       ${items.map(tab).join('')}
-      <div class="tab-add"><button class="fab" data-nav="deposit" aria-label="${u('addMoney')}">${icon('plus')}</button><span>${u('addMoney')}</span></div>
+      ${L('nav', 'addMoney') ? `<div class="tab-add"><button class="fab" data-nav="deposit" aria-label="${u('addMoney')}">${icon('plus')}</button><span>${u('addMoney')}</span></div>` : ''}
       ${items2.map(tab).join('')}
     </div></nav>`;
   }
   function drawer() {
     const drItem = (r, ic, lbl, on, color, img) => `<button class="dr-item ${on ? 'on' : ''}" data-nav="${r}"><span class="dr-ic ${img ? 'img' : ''}" ${!img && color ? `style="background:${color}"` : ''}>${img ? `<img src="${esc(img)}" alt="">` : icon(ic)}</span><span class="dr-l">${esc(lbl)}</span><span class="dr-ch">${icon('right')}</span></button>`;
-    const nav = [['deposit', 'wallet', u('recharge')], ['orders', 'box', u('orderHistory')], ['referrals', 'gift', u('referrals')], ['profile', 'user', u('profile')]];
+    const nav = [['deposit', 'wallet', u('recharge'), 'recharge'], ['orders', 'box', u('orderHistory'), 'orders'], ['referrals', 'gift', u('referrals'), 'referrals'], ['profile', 'user', u('profile'), 'profile']].filter((x) => L('menu', x[3]));
     // services grouped: category header -> its products
     const active = S.services.filter((s) => s.active);
     const cats = (S.cats || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -177,17 +178,15 @@
     const uncat = active.filter((s) => !cats.some((c) => c.id === (s.cat || ''))); if (uncat.length) catSections += `<div class="sec-h">${icon('grid')}${u('services')}</div><div class="qgrid">${uncat.map(qsCard).join('')}</div>`;
     if (!active.length) catSections = `<div class="sec-h">${icon('bolt')}${u('quickServices')}</div><div class="qgrid">${emptyBox(u('services'))}</div>`;
     v.innerHTML = `
-      <div class="hero"><div class="hero-lbl">${u('walletBalance')}</div><div class="hero-bal">${money(S.user.balance)}</div></div>
-
-      ${S.notices.length ? `<div class="sec-h">${icon('bell')}${u('noticeBoard')}</div>
+      ${L('home', 'notices') && S.notices.length ? `<div class="sec-h">${icon('bell')}${u('noticeBoard')}</div>
       <div>${S.notices.map((n) => `<div class="notice ${n.type === 'urgent' ? 'urgent' : ''}">
         <div class="notice-h">${icon(n.type === 'urgent' ? 'alert' : 'info')}<span>${esc(t(n.title))}</span></div>
         <div class="notice-b">${esc(t(n.body))}</div></div>`).join('')}</div>` : ''}
 
-      ${catSections}
+      ${L('home', 'products') ? catSections : ''}
 
-      <div class="sec-h">${icon('clock')}${u('recentOrders')}<span class="live-dot"><i></i>LIVE</span></div>
-      <div class="card">${S.live.length ? S.live.map(liveRow).join('') : emptyBox(u('noOrders'))}</div>
+      ${L('home', 'recent') ? `<div class="sec-h">${icon('clock')}${u('recentOrders')}<span class="live-dot"><i></i>LIVE</span></div>
+      <div class="card">${S.live.length ? S.live.map(liveRow).join('') : emptyBox(u('noOrders'))}</div>` : ''}
 
       <div style="height:10px"></div>`;
   }

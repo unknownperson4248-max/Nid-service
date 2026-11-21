@@ -4,7 +4,7 @@ import APP_JS from './client/app.client.js';
 import ADMIN_HTML from './client/admin.html';
 import ADMIN_CSS from './client/admin.css';
 import ADMIN_JS from './client/admin.client.js';
-import { DEFAULT_SETTINGS, DEFAULT_CATS, DEFAULT_SERVICES, DEFAULT_NOTICES } from './data.js';
+import { DEFAULT_SETTINGS, DEFAULT_CATS, DEFAULT_SERVICES, DEFAULT_NOTICES, TEXT_DEFAULTS } from './data.js';
 
 const enc = new TextEncoder();
 const PBKDF2_ITER = 100000;
@@ -245,7 +245,7 @@ async function handleApi(req, env, url, path, u, secure) {
 }
 
 const maskName = (n) => { const s = String(n || '').trim(); return s.length <= 2 ? s : s.slice(0, Math.max(2, s.length - 3)) + '***'; };
-const pubSettings = (s) => ({ brandA: s.brandA, brandB: s.brandB, logo: safeImg(s.logo), themeColor: safeHex(s.themeColor), tagline: s.tagline, currency: s.currency, minDeposit: s.minDeposit,
+const pubSettings = (s) => ({ texts: cleanTexts(s.texts), layout: cleanLayout(s.layout), brandA: s.brandA, brandB: s.brandB, logo: safeImg(s.logo), themeColor: safeHex(s.themeColor), tagline: s.tagline, currency: s.currency, minDeposit: s.minDeposit,
   depositMethods: s.depositMethods, referralBonus: s.referralBonus, whatsapp: s.whatsapp });
 async function bumpStat(env, k) { const key = 'stat:' + k; const n = +((await env.DATA.get(key)) || 0); await env.DATA.put(key, String(n + 1)); }
 
@@ -361,7 +361,22 @@ async function handleAdmin(req, env, url, path, u) {
     if (b.addBalance != null) { const n = Math.round(toNum(b.addBalance)); if (Number.isFinite(n)) t.balance = Math.max(0, Math.round((t.balance || 0) + n)); }
     if (b.setBalance != null) { const n = Math.round(toNum(b.setBalance)); if (Number.isFinite(n) && n >= 0) t.balance = n; }
     if (typeof b.blocked === 'boolean') t.blocked = b.blocked;
-    if (b.role && ['user', 'admin'].includes(b.role)) t.role = b.role;
+    if (b.role && ['user', 'admin'].includes(b.role)) {
+      // never leave the site without an admin
+      if (t.role === 'admin' && b.role === 'user' && t.id === u.id) return json({ ok: false, error: 'self' }, 400);
+      t.role = b.role;
+    }
+    if (b.name) t.name = clip(b.name, 60);
+    if (b.phone && b.phone !== t.phone) {
+      const ph = clip(b.phone, 14);
+      if (!PHONE_RE.test(ph)) return json({ ok: false, error: 'phone' }, 400);
+      if (await env.DATA.get('phone:' + ph)) return json({ ok: false, error: 'exists' }, 409);
+      await env.DATA.delete('phone:' + t.phone); await env.DATA.put('phone:' + ph, t.id); t.phone = ph;
+    }
+    if (b.password) {
+      if (String(b.password).length < 6) return json({ ok: false, error: 'short' }, 400);
+      t.salt = rid(16); t.iter = PBKDF2_ITER; t.hash = await pbkdf2(String(b.password), t.salt, PBKDF2_ITER);
+    }
     await env.DATA.put('u:' + t.id, JSON.stringify(t));
     return json({ ok: true, user: pubUser(t) });
   }
@@ -382,11 +397,13 @@ async function handleAdmin(req, env, url, path, u) {
       const cur = await getSettings(env);
       const next = { ...cur, ...b.settings };
       next.themeColor = safeHex(next.themeColor); next.logo = safeImg(next.logo);
+      next.texts = cleanTexts(next.texts); next.layout = cleanLayout(next.layout);
       next.seoTitle = clip(next.seoTitle, 90); next.seoDesc = clip(next.seoDesc, 300);
       await env.DATA.put('settings', JSON.stringify(next));
       return json({ ok: true });
     }
-    return json({ ok: true, settings: await getSettings(env) });
+    const st = await getSettings(env);
+    return json({ ok: true, settings: { ...st, texts: cleanTexts(st.texts), layout: cleanLayout(st.layout) }, textDefaults: TEXT_DEFAULTS });
   }
 
   return json({ ok: false, error: 'not_found' }, 404);
@@ -403,6 +420,23 @@ async function syncUserDeposit(env, d) {
   if (i >= 0) { dl[i].status = d.status; await env.DATA.put('udep:' + d.uid, JSON.stringify(dl)); }
 }
 
+
+/* ---------- layout + texts ---------- */
+const LAYOUT_DEFAULTS = {
+  home: { notices: true, products: true, recent: true },
+  menu: { recharge: true, orders: true, referrals: true, profile: true },
+  nav: { orders: true, addMoney: true, referrals: true, profile: true },
+};
+function cleanLayout(l) {
+  const out = {};
+  for (const g of Object.keys(LAYOUT_DEFAULTS)) { out[g] = {}; for (const k of Object.keys(LAYOUT_DEFAULTS[g])) out[g][k] = l && l[g] && typeof l[g][k] === 'boolean' ? l[g][k] : LAYOUT_DEFAULTS[g][k]; }
+  return out;
+}
+function cleanTexts(t) {
+  const out = {};
+  if (t && typeof t === 'object') for (const k of Object.keys(TEXT_DEFAULTS)) { const v = clip(t[k], 200); if (v) out[k] = v; }
+  return out;
+}
 
 /* ---------- theme + SEO ---------- */
 const safeHex = (h) => (/^#[0-9a-f]{6}$/i.test(String(h || '')) ? String(h).toLowerCase() : '#0f766e');

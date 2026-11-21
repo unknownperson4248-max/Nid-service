@@ -33,7 +33,7 @@
   }
   function renderNoAdmin() { root.innerHTML = `<div class="login"><div class="login-card" style="text-align:center"><div class="mark">${icon('lock')}</div><h2>Not an admin</h2><p>This account has no admin access.</p><a class="btn" href="/">Go to app</a></div></div>`; }
 
-  const NAV = [['dash', 'dash', 'Dashboard'], ['orders', 'box', 'Orders'], ['deposits', 'wallet', 'Deposits'], ['services', 'grid', 'Services'], ['users', 'users', 'Users'], ['notices', 'bell', 'Notices'], ['settings', 'cog', 'Settings']];
+  const NAV = [['dash', 'dash', 'Dashboard'], ['orders', 'box', 'Orders'], ['deposits', 'wallet', 'Deposits'], ['services', 'grid', 'Services'], ['users', 'users', 'Users'], ['notices', 'bell', 'Notices'], ['texts', 'edit', 'Texts'], ['layout', 'grid', 'Layout'], ['settings', 'cog', 'Settings']];
   function renderShell() {
     root.innerHTML = `<div class="wrap">
       <aside class="side ${S.menuOpen ? 'on' : ''}"><div class="brand"><span class="mark">${icon('bolt')}</span><b>WizeFF Admin</b></div>
@@ -46,7 +46,7 @@
   }
   async function loadCounts() { const r = await api('/api/admin/overview'); if (r.ok) { S.stats = r.stats; const po = $('.orders-count'), pd = $('.deposits-count'); if (po && r.stats.pendingOrders) { po.textContent = r.stats.pendingOrders; po.style.display = ''; } if (pd && r.stats.pendingDeposits) { pd.textContent = r.stats.pendingDeposits; pd.style.display = ''; } } }
 
-  function go(tab) { S.tab = tab; document.querySelectorAll('.side nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab)); const titles = { dash: 'Dashboard', orders: 'Orders', deposits: 'Deposits', services: 'Services & Forms', users: 'Users', notices: 'Notices', settings: 'Settings' }; $('#title').textContent = titles[tab]; S.menuOpen = false; syncMenu(); const views = { dash: vDash, orders: vOrders, deposits: vDeposits, services: vServices, users: vUsers, notices: vNotices, settings: vSettings }; (views[tab] || vDash)(); }
+  function go(tab) { S.tab = tab; document.querySelectorAll('.side nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab)); const titles = { dash: 'Dashboard', orders: 'Orders', deposits: 'Deposits', services: 'Services & Forms', users: 'Users', notices: 'Notices', texts: 'Website texts', layout: 'Layout (show / hide)', settings: 'Settings' }; $('#title').textContent = titles[tab]; S.menuOpen = false; syncMenu(); const views = { dash: vDash, orders: vOrders, deposits: vDeposits, services: vServices, users: vUsers, notices: vNotices, texts: vTexts, layout: vLayout, settings: vSettings }; (views[tab] || vDash)(); }
   function syncMenu() { const s = $('.side'), sc = $('.side-scrim'); if (s) s.classList.toggle('on', S.menuOpen); if (sc) sc.classList.toggle('on', S.menuOpen); }
 
   /* ---------- dashboard ---------- */
@@ -225,16 +225,19 @@
     </tbody></table></div>`;
   }
   function userModal(x) {
-    modal('Manage user', `<div class="kvs"><div><span class="k">Name:</span> <b>${esc(x.name)}</b></div><div><span class="k">Phone:</span> <b>${esc(x.phone)}</b></div><div><span class="k">Balance:</span> <b>${money(x.balance)}</b></div></div>
+    modal('Manage user', `<div class="kvs"><div><span class="k">Balance:</span> <b>${money(x.balance)}</b></div><div><span class="k">Referral code:</span> <b>${esc(x.ref || '')}</b></div></div>
+      <div class="grid2" style="margin-top:12px"><div class="field"><label>Name</label><input id="u-name" value="${esc(x.name)}" maxlength="60"></div><div class="field"><label>Phone (login ID)</label><input id="u-phone" value="${esc(x.phone)}" maxlength="11" inputmode="numeric"></div></div>
+      <div class="field"><label>New password <span class="muted" style="font-weight:500">(leave empty to keep)</span></label><input id="u-pass" type="text" minlength="6" maxlength="100" autocomplete="off"></div>
       <div class="grid2" style="margin-top:12px"><div class="field"><label>Add / subtract balance (৳)</label><input id="u-add" type="number" placeholder="e.g. 100 or -50"></div><div class="field"><label>Set exact balance (৳)</label><input id="u-set" type="number" placeholder="leave blank"></div></div>
       <div class="field"><label>Role</label><select id="u-role"><option value="user" ${x.role === 'user' ? 'selected' : ''}>user</option><option value="admin" ${x.role === 'admin' ? 'selected' : ''}>admin</option></select></div>
       <label class="flex" style="gap:6px"><input type="checkbox" id="u-block" ${x.blocked ? 'checked' : ''} style="width:auto"> Blocked</label>`,
       `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="u-save">${icon('check')}Save</button>`);
     $('#u-save').addEventListener('click', async () => {
-      const body = { id: x.id, role: $('#u-role').value, blocked: $('#u-block').checked };
+      const body = { id: x.id, role: $('#u-role').value, blocked: $('#u-block').checked, name: $('#u-name').value.trim(), phone: $('#u-phone').value.trim() };
+      if ($('#u-pass').value) { if ($('#u-pass').value.length < 6) { toast('Password: min 6'); return; } body.password = $('#u-pass').value; }
       if ($('#u-add').value) body.addBalance = Number($('#u-add').value);
       if ($('#u-set').value) body.setBalance = Number($('#u-set').value);
-      const r = await api('/api/admin/user', body); if (r.ok) { toast('Saved'); closeModal(); vUsers(); } else toast('Error');
+      const r = await api('/api/admin/user', body); if (r.ok) { toast('Saved'); closeModal(); vUsers(); } else toast(r.error === 'exists' ? 'This phone already has an account' : r.error === 'phone' ? 'Phone must be 01XXXXXXXXX' : r.error === 'self' ? 'You cannot remove your own admin' : 'Error');
     });
   }
 
@@ -249,6 +252,38 @@
     <div class="flex" style="justify-content:space-between"><select data-nf="${i}:type" style="max-width:160px"><option value="info" ${n.type === 'info' ? 'selected' : ''}>info</option><option value="urgent" ${n.type === 'urgent' ? 'selected' : ''}>urgent</option></select><button class="btn btn-bad btn-sm" data-del-notice="${i}">${icon('trash')}Delete</button></div></div>`).join('') || '<div class="empty">No notices</div>';
   function saveNotices() {
     document.querySelectorAll('[data-nf]').forEach((el) => { const [i, path] = el.dataset.nf.split(':'); const n = notices[+i]; if (!n) return; n[path] = el.value; });
+  }
+
+  /* ---------- website texts (every label on the site) ---------- */
+  async function vTexts() {
+    const c = $('#content'); c.innerHTML = '<div class="spin"></div>';
+    const r = await api('/api/admin/settings'); const cur = (r.settings && r.settings.texts) || {}; const def = r.textDefaults || {};
+    c.innerHTML = `<div class="card"><div class="card-h">${icon('edit')}Every text on the website<span class="muted" style="font-weight:500;font-size:12px;margin-left:8px">Leave a box empty to keep the default (shown in grey).</span></div>
+      <div class="card-b"><input id="tx-q" placeholder="Search text..." style="margin-bottom:12px">
+      <div id="tx-list" class="grid2">${Object.keys(def).map((k) => `<div class="field" data-tx-row="${esc((def[k] + ' ' + (cur[k] || '')).toLowerCase())}"><label>${esc(def[k])}</label><input data-tx="${esc(k)}" maxlength="200" value="${esc(cur[k] || '')}" placeholder="${esc(def[k])}"></div>`).join('')}</div></div></div>
+      <div style="margin-top:16px" class="flex"><button class="btn btn-ok" id="tx-save">${icon('check')}Save texts</button><button class="btn btn-ghost" id="tx-reset">Reset all to default</button></div>`;
+    $('#tx-q').addEventListener('input', (e) => { const q = e.target.value.toLowerCase(); document.querySelectorAll('[data-tx-row]').forEach((el) => { el.style.display = !q || el.dataset.txRow.includes(q) ? '' : 'none'; }); });
+    const save = async (texts) => { const r2 = await api('/api/admin/settings', { settings: { texts } }); toast(r2.ok ? 'Saved ✓' : 'Error'); if (r2.ok) vTexts(); };
+    $('#tx-save').addEventListener('click', () => { const texts = {}; document.querySelectorAll('[data-tx]').forEach((el) => { if (el.value.trim()) texts[el.dataset.tx] = el.value.trim(); }); save(texts); });
+    $('#tx-reset').addEventListener('click', () => { if (confirm('Reset every text to default?')) save({}); });
+  }
+
+  /* ---------- layout: show / hide parts of the site ---------- */
+  async function vLayout() {
+    const c = $('#content'); c.innerHTML = '<div class="spin"></div>';
+    const r = await api('/api/admin/settings'); const l = (r.settings && r.settings.layout) || {};
+    const groups = [
+      ['home', 'Dashboard sections', [['notices', 'Notice board'], ['products', 'Products (category boxes)'], ['recent', 'Recent orders (LIVE)']]],
+      ['menu', '3-dot menu items', [['recharge', 'Recharge / Add money'], ['orders', 'Order history'], ['referrals', 'Referrals'], ['profile', 'Profile']]],
+      ['nav', 'Bottom navigation bar', [['orders', 'Orders'], ['addMoney', '+ Add money (center)'], ['referrals', 'Referrals'], ['profile', 'Profile']]],
+    ];
+    c.innerHTML = groups.map(([g, title, items]) => `<div class="card" style="margin-bottom:16px"><div class="card-h">${icon('grid')}${title}</div><div class="card-b">
+      ${items.map(([k, lbl]) => `<label class="flex" style="justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)"><span style="font-weight:600">${lbl}</span><input type="checkbox" data-lay="${g}:${k}" ${!(l[g] && l[g][k] === false) ? 'checked' : ''} style="width:22px;height:22px"></label>`).join('')}
+    </div></div>`).join('') + `<button class="btn btn-ok" id="lay-save">${icon('check')}Save layout</button>`;
+    $('#lay-save').addEventListener('click', async () => {
+      const layout = {}; document.querySelectorAll('[data-lay]').forEach((el) => { const [g, k] = el.dataset.lay.split(':'); (layout[g] = layout[g] || {})[k] = el.checked; });
+      const r2 = await api('/api/admin/settings', { settings: { layout } }); toast(r2.ok ? 'Saved ✓' : 'Error');
+    });
   }
 
   /* ---------- settings ---------- */
