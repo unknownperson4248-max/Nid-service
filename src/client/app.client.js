@@ -293,10 +293,13 @@
     if (S.route !== 'orders') return;
     const items = (r.items || []);
     v.innerHTML = `<div class="ph"><button class="back" data-back>${icon('left')}</button><h2>${u('orderHistory')}</h2></div>
-      ${items.length ? `<div class="card">${items.map(orderRow).join('')}</div>` : emptyBox(u('noOrders'))}<div style="height:10px"></div>`;
+      ${items.length ? `<div class="ord-list">${items.map(orderRow).join('')}</div>` : emptyBox(u('noOrders'))}<div style="height:10px"></div>`;
   }
-  const orderRow = (o) => `<button class="ord-row" style="width:100%;text-align:left" data-order='${esc(JSON.stringify({ id: o.id, svcId: o.svcId, svcName: o.svcName, fields: o.fields, amount: o.amount, status: o.status, ts: o.ts, note: o.note, respImg: o.respImg }))}'>
-    <span class="ord-av">${icon('box')}</span><span class="ord-main"><b>${esc(t(o.svcName))}</b><small>${o.id} • ${ago(o.ts)} • ${money(o.amount)}</small></span>${statusBadge(o.status)}</button>`;
+  const orderRow = (o) => { const data = esc(JSON.stringify({ id: o.id, svcId: o.svcId, svcName: o.svcName, fields: o.fields, amount: o.amount, status: o.status, ts: o.ts, note: o.note, respImg: o.respImg }));
+    return `<div class="ord-card" data-order='${data}'>
+      <div class="ord-top"><span class="ord-av">${icon('box')}</span><span class="ord-main"><b>${esc(t(o.svcName))}</b><small>${o.id} • ${ago(o.ts)}</small></span>${statusBadge(o.status)}</div>
+      <div class="ord-foot"><span class="ord-amt">${money(o.amount)}</span><button class="ord-det" data-order='${data}'>${icon('eye')}${u('details')}${icon('right')}</button></div>
+    </div>`; };
 
   /* ---------- deposit / add money ---------- */
   async function viewDeposit(v) {
