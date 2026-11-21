@@ -1,0 +1,12 @@
+name = "wizeff-topup"
+main = "src/worker.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
+
+rules = [
+  { type = "Text", globs = ["**/*.html", "**/*.css", "**/*.client.js"], fallthrough = true },
+]
+
+[[kv_namespaces]]
+binding = "DATA"
+id = "46b1b5952f8e4badb37bd59c909ff8b7"
