@@ -285,6 +285,37 @@ async function bumpStat(env, k) { const key = 'stat:' + k; const n = +((await en
 async function handleAdmin(req, env, url, path, u) {
   if (!u || u.role !== 'admin') return json({ ok: false, error: 'forbidden' }, 403);
 
+  // optional extra "admin panel password" gate
+  const aset = await getSettings(env);
+  if (path === '/api/admin/unlock') {
+    if (req.method !== 'POST') return json({ ok: false }, 405);
+    let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
+    if (!aset.adminPass) return json({ ok: true });
+    const ok = (await pbkdf2(String(b.pass || ''), aset.adminPass.salt, aset.adminPass.iter || PBKDF2_ITER)) === aset.adminPass.hash;
+    if (!ok) return json({ ok: false, error: 'wrongpass' }, 401);
+    const sess = (await env.DATA.get('sess:' + u._token, 'json')) || { uid: u.id, ts: now() };
+    sess.adm = true;
+    await env.DATA.put('sess:' + u._token, JSON.stringify(sess), { expirationTtl: SESSION_DAYS * 86400 });
+    return json({ ok: true });
+  }
+  if (path === '/api/admin/setpass') {
+    if (req.method !== 'POST') return json({ ok: false }, 405);
+    let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
+    const p = String(b.pass || '');
+    if (p !== '' && p.length < 4) return json({ ok: false, error: 'short' }, 400);
+    if (p === '') aset.adminPass = null;
+    else { const salt = rid(16); aset.adminPass = { salt, iter: PBKDF2_ITER, hash: await pbkdf2(p, salt, PBKDF2_ITER) }; }
+    await env.DATA.put('settings', JSON.stringify(aset));
+    const sess = (await env.DATA.get('sess:' + u._token, 'json')) || { uid: u.id, ts: now() };
+    sess.adm = true; // keep the setter unlocked so they are not locked out immediately
+    await env.DATA.put('sess:' + u._token, JSON.stringify(sess), { expirationTtl: SESSION_DAYS * 86400 });
+    return json({ ok: true, passSet: !!aset.adminPass });
+  }
+  if (aset.adminPass) {
+    const sess = await env.DATA.get('sess:' + u._token, 'json');
+    if (!sess || !sess.adm) return json({ ok: false, error: 'locked' }, 401);
+  }
+
   if (path === '/api/admin/overview') {
     const [orders, deps, users] = await Promise.all([
       env.DATA.list({ prefix: 'o:', limit: 1000 }), env.DATA.list({ prefix: 'dep:', limit: 1000 }), env.DATA.list({ prefix: 'u:', limit: 1000 }),
@@ -433,6 +464,7 @@ async function handleAdmin(req, env, url, path, u) {
       next.seoTitle = clip(next.seoTitle, 90); next.seoDesc = clip(next.seoDesc, 300);
       next.heroTitle = clip(next.heroTitle, 80); next.heroSub = clip(next.heroSub, 160); next.heroImg = safeImg(next.heroImg);
       if (Array.isArray(next.banners)) next.banners = next.banners.slice(0, 8).map((b) => ({ img: safeImg(b && b.img), link: clip((b && b.link) || '', 120) })).filter((b) => b.img);
+      next.adminPass = cur.adminPass || null; // only changed via /api/admin/setpass, never the generic save
       const hexish = (v, fallback) => (/^#[0-9a-f]{3,8}$/i.test(String(v || '')) ? String(v) : fallback);
       if (Array.isArray(next.depositMethods)) next.depositMethods = next.depositMethods.slice(0, 12).map((m) => ({
         id: clip(m.id, 20) || rid(8), label: clip(m.label, 30), color: hexish(m.color, '#0f766e'), active: m.active !== false,
@@ -447,7 +479,7 @@ async function handleAdmin(req, env, url, path, u) {
       return json({ ok: true });
     }
     const st = await getSettings(env);
-    return json({ ok: true, settings: { ...st, texts: cleanTexts(st.texts), layout: cleanLayout(st.layout) }, textDefaults: TEXT_DEFAULTS });
+    return json({ ok: true, settings: { ...st, adminPass: undefined, texts: cleanTexts(st.texts), layout: cleanLayout(st.layout) }, adminPassSet: !!st.adminPass, textDefaults: TEXT_DEFAULTS });
   }
 
   return json({ ok: false, error: 'not_found' }, 404);

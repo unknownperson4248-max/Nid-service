@@ -23,7 +23,15 @@
   let S = { me: null, tab: 'dash', stats: {}, services: [], cats: [], menuOpen: false };
 
   /* ---------- boot ---------- */
-  async function boot() { const me = await api('/api/me'); S.me = me.user; root.setAttribute('aria-busy', 'false'); if (!S.me) return renderLogin(); if (S.me.role !== 'admin') return renderNoAdmin(); renderShell(); go('dash'); }
+  async function boot() { const me = await api('/api/me'); S.me = me.user; root.setAttribute('aria-busy', 'false'); if (!S.me) return renderLogin(); if (S.me.role !== 'admin') return renderNoAdmin(); const ov = await api('/api/admin/overview'); if (ov && ov.error === 'locked') return renderUnlock(); renderShell(); go('dash'); }
+  function renderUnlock(err) {
+    root.innerHTML = `<div class="login"><form class="login-card" id="uf"><div class="mark">${icon('lock')}</div><h2>Admin panel locked</h2><p>Enter the admin panel password</p>
+      ${err ? `<div class="err">${esc(err)}</div>` : ''}
+      <div class="field"><label>Admin password</label><input name="pass" type="password" autocomplete="off" required autofocus></div>
+      <button class="btn" style="width:100%">${icon('lock')}Unlock</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-act="logout" style="width:100%;margin-top:8px">Logout</button></form></div>`;
+    $('#uf').addEventListener('submit', async (e) => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); const r = await api('/api/admin/unlock', { pass: d.pass }); if (r.ok) { renderShell(); go('dash'); } else renderUnlock('Wrong password'); });
+  }
   function renderLogin(err) {
     root.innerHTML = `<div class="login"><form class="login-card" id="lf"><div class="mark">${icon('lock')}</div><h2>Admin Login</h2><p>WizeFF TopUp</p>
       ${err ? `<div class="err">${esc(err)}</div>` : ''}
@@ -361,8 +369,16 @@
       <div class="field"><label>Currency</label><input id="s-cur" value="${esc(s.currency || '৳')}" maxlength="3"></div><div class="field"><label>Min deposit (৳)</label><input id="s-min" type="number" value="${s.minDeposit || 20}"></div>
       <div class="field"><label>Referral bonus (৳)</label><input id="s-ref" type="number" value="${s.referralBonus || 0}"></div><div class="field"><label>WhatsApp (support)</label><input id="s-wa" value="${esc(s.whatsapp || '')}" placeholder="8801XXXXXXXXX"></div></div>
     </div></div>
+    <div class="card" style="margin-top:16px"><div class="card-h">${icon('lock')}Admin panel password</div><div class="card-b">
+      <div class="muted" style="font-size:12px;margin-bottom:10px">Extra password asked when opening the admin panel (after login). ${r.adminPassSet ? '<b style="color:#16a34a">Currently ON</b>' : 'Currently <b>OFF</b>'} • min 4 characters.</div>
+      <div class="field"><label>${r.adminPassSet ? 'New admin password' : 'Set admin password'}</label><input id="s-admpass" type="password" autocomplete="new-password" minlength="4" maxlength="100" placeholder="••••••"></div>
+      <div class="flex"><button type="button" class="btn btn-sm" id="s-admset">${icon('check')}${r.adminPassSet ? 'Change password' : 'Set password'}</button>${r.adminPassSet ? `<button type="button" class="btn btn-bad btn-sm" id="s-admdel">${icon('trash')}Remove</button>` : ''}</div>
+      ${r.adminPassSet ? '' : '<div class="muted" style="font-size:11px;margin-top:8px">Note: remember this password — if forgotten you will need to reset it from the server.</div>'}
+    </div></div>
     <div style="margin-top:16px"><button class="btn btn-ok" id="s-save">${icon('check')}Save settings</button></div>`;
     $('#s-save').addEventListener('click', saveSettings);
+    $('#s-admset').addEventListener('click', async () => { const p = $('#s-admpass').value; if (p.length < 4) { toast('Min 4 characters'); return; } const rr = await api('/api/admin/setpass', { pass: p }); if (rr.ok) { toast('Admin password saved ✓'); vSettings(); } else toast(rr.error === 'short' ? 'Min 4 characters' : 'Error'); });
+    { const admdel = $('#s-admdel'); if (admdel) admdel.addEventListener('click', async () => { if (!confirm('Remove the admin panel password?')) return; const rr = await api('/api/admin/setpass', { pass: '' }); if (rr.ok) { toast('Password removed'); vSettings(); } else toast('Error'); }); }
     $('#s-logobtn').addEventListener('click', () => $('#s-logofile').click());
     $('#s-logodel').addEventListener('click', () => { S.logo = ''; $('#s-logoprev').innerHTML = icon('eye'); $('#s-logodel').style.display = 'none'; });
     $('#s-logofile').addEventListener('change', async (e) => {

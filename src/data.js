@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS = {
   heroSub: 'Free Fire diamond, SMM & recharge. Fast, safe and reliable.',
   heroImg: '', // optional 3D illustration uploaded from admin
   banners: [], // promo banner images shown at the top of home: [{ img:'/img/..', link:'' }]
+  adminPass: null, // optional extra password to open the admin panel: { salt, iter, hash }
   tagline: { bn: 'দ্রুত • নিরাপদ • বিশ্বস্ত', en: 'Fast • Safe • Reliable' },
   currency: '৳',
   referralBonus: 10, // credited to referrer when a referred user's first deposit is approved
