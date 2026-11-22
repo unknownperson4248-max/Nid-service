@@ -147,7 +147,7 @@
         <div class="field"><label>Category</label><select id="f-cat">${S.cats.map((c) => `<option value="${esc(c.id)}" ${s.cat === c.id ? 'selected' : ''}>${esc(tl(c.name))}</option>`).join('')}</select></div>
         <div class="field"><label>Icon (if no image)</label><select id="f-icon">${['bolt', 'diamond', 'crown', 'thumb', 'phone', 'wallet', 'box', 'grid', 'money', 'eye'].map((n) => `<option value="${n}" ${s.icon === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
         <div class="field"><label>Color</label><input id="f-color" type="color" value="${esc(s.color || '#0f766e')}" style="height:42px;padding:3px"></div>
-        <div class="field"><label>Base price (৳)</label><input id="f-price" type="number" value="${s.price || 0}"><div class="muted" style="font-size:11px">0 = price from options below</div></div>
+        <div class="field"><label>Product price (৳)</label><input id="f-price" type="number" min="0" value="${s.price || 0}"><div class="muted" style="font-size:11px">One price for this product, cut from balance. Keep 0 only if you use a Dropdown with per-option prices.</div></div>
       </div>
       <div class="flex" style="margin:4px 0 14px">
         <label class="flex" style="gap:6px"><input type="checkbox" id="f-active" ${s.active ? 'checked' : ''} style="width:auto"> Active</label>
@@ -180,7 +180,6 @@
         <div class="field"><label>Key (english, no space)</label><input data-ff="${i}:key" value="${esc(f.key || '')}" placeholder="auto"></div>
         <div class="field"><label>Type</label><select data-ff="${i}:type">${[['text', 'Single line text'], ['number', 'Number'], ['phone', 'Phone number'], ['select', 'Dropdown / package (choose one)'], ['textarea', 'Multi-line note'], ['date', 'Date'], ['image', 'Image upload (buyer attaches a picture)']].map(([tp, lbl]) => `<option value="${tp}" ${f.type === tp ? 'selected' : ''}>${lbl}</option>`).join('')}</select></div>
         <div class="field"><label>Placeholder</label><input data-ff="${i}:ph" value="${esc(f.ph || '')}"></div>
-        <div class="field"><label>Price (৳) — cut from balance</label><input type="number" min="0" data-ff="${i}:price" value="${f.price != null ? f.price : ''}" placeholder="0 = free"></div>
         <div class="field"><label class="flex" style="gap:6px;margin-top:24px"><input type="checkbox" data-ff="${i}:required" ${f.required ? 'checked' : ''} style="width:auto"> Required</label></div>
       </div>
       ${f.type === 'number' ? `<div class="grid2"><div class="field"><label>Min</label><input type="number" data-ff="${i}:min" value="${f.min != null ? f.min : ''}"></div><div class="field"><label>Max</label><input type="number" data-ff="${i}:max" value="${f.max != null ? f.max : ''}"></div><div class="field"><label class="flex" style="gap:6px"><input type="checkbox" data-ff="${i}:priceFromValue" ${f.priceFromValue ? 'checked' : ''} style="width:auto"> Value = price</label></div></div>` : ''}
