@@ -423,3 +423,92 @@ body{background:
 .pm-tab.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 10%,#fff);box-shadow:0 6px 14px -9px var(--c)}
 .pm-tab.na{opacity:.55}
 .pm-tab small{font-weight:600;font-size:10px;color:var(--bad)}
+
+/* ======================= CLAYMORPHISM THEME ======================= */
+/* Soft, puffy "clay" look: solid pastel surfaces, no blur/glass, every
+   shape reads as inflated 3D clay via a paired light+dark shadow, and
+   presses inward (inset shadow) when tapped. */
+:root{
+  --clay-bg:color-mix(in srgb,var(--brand) 7%,#e9f1ef);
+  --clay-card:color-mix(in srgb,var(--brand) 3%,#f3faf8);
+  --clay-hi:rgba(255,255,255,.9);
+  --clay-lo:rgba(166,182,198,.55);
+  --clay-lo2:rgba(166,182,198,.32);
+  --clay-out:6px 6px 14px var(--clay-lo),-6px -6px 14px var(--clay-hi);
+  --clay-out-sm:3px 3px 7px var(--clay-lo2),-3px -3px 7px var(--clay-hi);
+  --clay-in:inset 4px 4px 8px var(--clay-lo),inset -4px -4px 8px var(--clay-hi);
+  --clay-in-sm:inset 2px 2px 5px var(--clay-lo),inset -2px -2px 5px var(--clay-hi);
+  --glass-brd:transparent; /* neutralise the old glass border everywhere it's still referenced */
+}
+body{background:var(--clay-bg)!important;background-attachment:fixed}
+*{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+
+/* top bar: puffy flat bar, no blur */
+.top{background:var(--clay-bg);border-bottom:0;box-shadow:0 1px 0 var(--clay-lo2)}
+.icon-btn,.wallet,.avatar{background:var(--clay-card);border:0;box-shadow:var(--clay-out-sm);transition:box-shadow .15s,transform .15s}
+.icon-btn:active,.wallet:active{box-shadow:var(--clay-in-sm);transform:scale(.97)}
+.logo-mark,.logo-img{box-shadow:var(--clay-out-sm)}
+
+/* generic cards + product tiles: solid clay surface, big soft radius */
+.card,.qs,.ord-card,.dep-sum,.pay-detail,.resp,.sheet,.notice,.err-msg,.ok-msg,.auth-card,.empty{
+  background:var(--clay-card)!important;border:0!important;border-radius:22px;box-shadow:var(--clay-out)}
+.card-pad{border-radius:22px}
+.qs{transition:box-shadow .15s,transform .15s}
+.qs:active{box-shadow:var(--clay-in);transform:scale(.98)}
+.qs-ic{box-shadow:var(--clay-out-sm),inset 0 2px 3px rgba(255,255,255,.35),inset 0 -2px 4px rgba(0,0,0,.12)!important}
+.qs-ic.img{box-shadow:var(--clay-out-sm)!important}
+.notice{border-left:0!important;box-shadow:var(--clay-out-sm)}
+.notice.urgent{background:color-mix(in srgb,var(--bad) 7%,var(--clay-card))!important}
+.svc-hero{box-shadow:var(--clay-out)!important;border:0}
+.svc-hero .qs-ic{background:rgba(255,255,255,.22)!important;box-shadow:inset 0 2px 3px rgba(255,255,255,.3),inset 0 -2px 4px rgba(0,0,0,.15)!important}
+.svc-price{background:rgba(255,255,255,.24)!important;border:0!important;box-shadow:var(--clay-in-sm)}
+.svc-banner{box-shadow:var(--clay-out);border:0!important;border-radius:22px}
+.hero{box-shadow:var(--clay-out),inset 0 2px 3px rgba(255,255,255,.25)!important}
+.hero::before{display:none}
+
+/* buttons: puffy, press inward on tap */
+.btn{box-shadow:var(--clay-out-sm),inset 0 1px 0 rgba(255,255,255,.3);transition:box-shadow .12s,transform .12s;border-radius:16px}
+.btn:active{box-shadow:var(--clay-in-sm);transform:scale(.97)}
+.btn-ghost{background:var(--clay-card)!important;border:0!important;box-shadow:var(--clay-out-sm)}
+.btn-ghost:active{box-shadow:var(--clay-in-sm)}
+.ord-det,.pay-copy,.img-up-btn{box-shadow:var(--clay-out-sm);border-radius:14px;transition:box-shadow .12s,transform .12s}
+.ord-det:active,.pay-copy:active,.img-up-btn:active{box-shadow:var(--clay-in-sm);transform:scale(.96)}
+.img-up-prev{background:var(--clay-card);border:0!important;box-shadow:var(--clay-in-sm)}
+
+/* package tiles / amount chips / payment tabs: puffy toggle buttons */
+.pk,.amt,.pm-tab{background:var(--clay-card)!important;border:0!important;box-shadow:var(--clay-out-sm);border-radius:16px;transition:box-shadow .15s,transform .12s}
+.pk:active,.amt:active,.pm-tab:active{transform:scale(.96)}
+.pk.on,.amt.on{box-shadow:var(--clay-in-sm),0 0 0 2px var(--brand) inset!important}
+.pm-tab.on{box-shadow:var(--clay-in-sm),0 0 0 2px var(--c) inset!important}
+.pay-num{background:var(--clay-card)!important;border:0!important;box-shadow:var(--clay-in-sm)}
+.dep-range{background:var(--clay-card)!important;box-shadow:var(--clay-out-sm)}
+.resp-b{background:var(--clay-card)!important;border:0!important;box-shadow:var(--clay-in-sm)}
+
+/* bottom nav: a puffy floating clay pill */
+.tabbar{background:var(--clay-card);border:0;box-shadow:var(--clay-out);border-radius:28px}
+.tab.on::before{background:var(--clay-card);box-shadow:var(--clay-in-sm)!important}
+.tab-add .fab{box-shadow:var(--clay-out),inset 0 2px 3px rgba(255,255,255,.3);border:0}
+.tab-add .fab:active{box-shadow:var(--clay-in)}
+
+/* side menu: solid clay panel, no glass sheen */
+.drawer{background:var(--clay-card);border:0;box-shadow:var(--clay-out),18px 0 40px -22px rgba(18,38,60,.35)}
+.drawer::after{display:none}
+.dr-head::before{display:none}
+.dr-back{box-shadow:var(--clay-out-sm)}
+.dr-ic{box-shadow:var(--clay-out-sm),inset 0 2px 3px rgba(255,255,255,.14),inset 0 -2px 4px rgba(0,0,0,.25)!important}
+.dr-item.on,.dr-item:active{box-shadow:var(--clay-in-sm);background:var(--clay-card)!important}
+
+/* floating WhatsApp button: puffy circle */
+.wa-float{box-shadow:var(--clay-out),inset 0 2px 3px rgba(255,255,255,.3)}
+.wa-float::after{display:none}
+
+/* inputs: slightly recessed, clay "carved in" look */
+input,select,textarea{background:var(--clay-card)!important;border:0!important;box-shadow:var(--clay-in-sm);border-radius:14px}
+input:focus,select:focus,textarea:focus{box-shadow:var(--clay-in-sm),0 0 0 2px var(--brand)}
+.dep-amt-icon{box-shadow:var(--clay-out),inset 0 2px 3px rgba(255,255,255,.3),inset 0 -2px 4px rgba(0,0,0,.12)}
+.auth-logo .logo-mark{box-shadow:var(--clay-out)}
+.auth-tabs{background:var(--clay-bg);box-shadow:var(--clay-in-sm);border-radius:16px}
+.auth-tabs button.on{background:var(--clay-card)!important;box-shadow:var(--clay-out-sm)!important}
+.toast{box-shadow:var(--clay-out)}
+
+@media (prefers-reduced-motion:reduce){.qs,.btn,.pk,.amt,.pm-tab,.icon-btn{transition:none}}
