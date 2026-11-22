@@ -3,6 +3,10 @@ main = "src/worker.js"
 compatibility_date = "2025-01-01"
 workers_dev = true
 
+routes = [
+  { pattern = "app.wizenex.com", custom_domain = true }
+]
+
 rules = [
   { type = "Text", globs = ["**/*.html", "**/*.css", "**/*.client.js"], fallthrough = true },
 ]
