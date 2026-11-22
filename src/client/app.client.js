@@ -459,12 +459,24 @@
     v.innerHTML = `<div class="ph"><button class="back" data-back>${icon('left')}</button><h2>${u('transactions')}</h2></div>
       <div class="txn-bal"><div class="txn-bal-t"><span>${u('walletBalance')}</span><b>${money(S.user.balance)}</b></div>
         <button class="txn-add" data-nav="deposit">${icon('plus')}<span>${u('addMoney')}</span></button></div>
+      <div id="ref-wrap"></div>
       <div class="sec-h">${icon('clock')}${u('txnHistory')}</div>
       <div class="card" id="txn-list"><div class="spin"></div></div><div style="height:10px"></div>`;
-    const dr = await api('/api/deposits');
+    const [rf, dr] = await Promise.all([api('/api/referrals'), api('/api/deposits')]);
     if (S.route !== 'transactions') return;
+    const rw = $('#ref-wrap');
+    if (rw && rf && rf.ok) {
+      const link = location.origin + '/?ref=' + (rf.ref || '');
+      rw.innerHTML = `<div class="sec-h">${icon('gift')}${en ? 'Refer & earn' : 'রেফার করে আয়'}</div>
+        <div class="ref-card">
+          <div class="ref-lbl">${u('yourRef')}</div><div class="ref-code">${esc(rf.ref || '')}</div>
+          <div class="ref-row"><button class="ref-btn solid" data-copy="${esc(link)}">${icon('copy')}${u('copy')}</button><button class="ref-btn" data-share="${esc(link)}">${icon('gift')}${u('share')}</button></div>
+        </div>
+        <div class="ref-stats"><div class="ref-stat"><span>${u('refBy')}</span><b>${rf.count || 0}</b></div><div class="ref-stat"><span>${u('earned')}</span><b>${money(rf.earned || 0)}</b></div></div>
+        <div class="notice"><div class="notice-b">${u('refNote')} ${en ? 'Bonus' : 'বোনাস'}: ${money(rf.bonus || 0)}</div></div>`;
+    }
     const el = $('#txn-list'); if (!el) return;
-    el.innerHTML = (dr.items && dr.items.length)
+    el.innerHTML = (dr && dr.items && dr.items.length)
       ? dr.items.map((d) => `<div class="ord-row"><span class="ord-av txn-in">${icon('wallet')}</span><span class="ord-main"><b>+ ${money(d.amount)} • ${esc(d.method)}</b><small>${esc(d.id)} • ${ago(d.ts)}</small></span>${statusBadge(d.status === 'pending' ? 'pending' : d.status === 'approved' ? 'approved' : 'rejected')}</div>`).join('')
       : emptyBox(en ? 'No transactions yet' : 'এখনো কোনো লেনদেন নেই');
   }
