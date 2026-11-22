@@ -587,10 +587,10 @@ input:focus,select:focus,textarea:focus{background:#fff!important;border-color:v
 /* ======================= DARK LUXURY — black & gold premium ======================= */
 :root{
   --lx-bg:#0a0c11; --lx-bg2:#0e1118; --lx-card:#161b24; --lx-card2:#1b212c;
-  --lx-line:rgba(255,255,255,.07); --lx-ink:#f3f1ea; --lx-sub:#aeb6c2; --lx-muted:#8b94a2;
+  --lx-line:rgba(255,255,255,.07); --lx-ink:#fbfcfe; --lx-sub:#d6dbe4; --lx-muted:#b4bcc9;
   --lx-gold:#e8c379; --lx-gold2:#caa24a; --lx-gold-d:#9c7420;
   --gold-g:linear-gradient(145deg,#f3d699,#c9992f);
-  --ink:#f3f1ea; --muted:#8b94a2; --line:rgba(255,255,255,.07);
+  --ink:#fbfcfe; --muted:#b4bcc9; --line:rgba(255,255,255,.07);
 }
 body{color:var(--lx-ink)!important;background:
   radial-gradient(1200px 520px at 50% -12%,rgba(232,195,121,.09),transparent 62%),
