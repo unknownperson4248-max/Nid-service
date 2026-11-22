@@ -149,6 +149,9 @@ function computeOrder(svc, fields) {
     } else if (f.type === 'phone') {
       const p = clip(v, 14); if (!PHONE_RE.test(p)) return { error: f.key };
       clean[f.key] = p;
+    } else if (f.type === 'image') {
+      const im = safeImg(v); if (!im) { if (f.required) return { error: f.key }; clean[f.key] = ''; continue; }
+      clean[f.key] = im;
     } else {
       clean[f.key] = clip(v, 500);
     }
@@ -170,6 +173,21 @@ async function handleApi(req, env, url, path, u, secure) {
   }
 
   if (!u) return json({ ok: false, error: 'auth' }, 401);
+
+  if (path === '/api/upload' && req.method === 'POST') {
+    // buyer attaches an image to an order field
+    const rk = 'ul:' + u.id; const n = +((await env.DATA.get(rk)) || 0);
+    if (n >= 30) return json({ ok: false, error: 'too_many' }, 429);
+    let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
+    const m = /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(String(b.dataUrl || ''));
+    if (!m) return json({ ok: false, error: 'type' }, 400);
+    const bin = Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0));
+    if (bin.byteLength > 3 * 1024 * 1024) return json({ ok: false, error: 'big' }, 400);
+    await env.DATA.put(rk, String(n + 1), { expirationTtl: 3600 });
+    const id = rid(16);
+    await env.DATA.put('media:' + id, bin, { metadata: { type: m[1] } });
+    return json({ ok: true, path: '/img/' + id });
+  }
 
   if (path === '/api/order' && req.method === 'POST') {
     let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }

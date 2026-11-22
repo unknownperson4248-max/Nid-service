@@ -83,7 +83,7 @@
   }
   function orderModal(o) {
     const svc = S.services.find((x) => x.id === o.svcId);
-    const rows = Object.entries(o.fields || {}).map(([k, v]) => { const f = svc && (svc.fields || []).find((x) => x.key === k); return `<div><span class="k">${esc(f ? tl(f.label) : k)}:</span> <b>${esc(v)}</b></div>`; }).join('');
+    const rows = Object.entries(o.fields || {}).map(([k, v]) => { const f = svc && (svc.fields || []).find((x) => x.key === k); const isImg = /^\/img\/[a-z0-9]{10,24}$/.test(String(v)); return `<div><span class="k">${esc(f ? tl(f.label) : k)}:</span> ${isImg ? `<a href="${esc(v)}" target="_blank" rel="noopener"><img src="${esc(v)}" alt="" style="max-width:140px;max-height:140px;border-radius:8px;border:1px solid var(--line);vertical-align:middle"></a>` : `<b>${esc(v)}</b>`}</div>`; }).join('');
     modal(`Order ${esc(o.id)}`, `
       <div class="flex" style="margin-bottom:10px">${badge(o.status)}<span class="pill">${new Date(o.ts).toLocaleString('en-GB')}</span></div>
       <div class="kvs"><div><span class="k">Customer:</span> <b>${esc(o.uname)}</b></div><div><span class="k">Service:</span> <b>${esc(tl(o.svcName))}</b></div><div><span class="k">Amount:</span> <b>${money(o.amount)}</b></div>${rows}</div>
@@ -153,7 +153,8 @@
         <label class="flex" style="gap:6px"><input type="checkbox" id="f-active" ${s.active ? 'checked' : ''} style="width:auto"> Active</label>
         <label class="flex" style="gap:6px"><input type="checkbox" id="f-featured" ${s.featured ? 'checked' : ''} style="width:auto"> Featured</label>
       </div>
-      <div class="flex" style="justify-content:space-between;margin-bottom:8px"><b style="font-family:var(--disp)">Order boxes (fields)</b><button class="btn btn-sm" data-act="add-field">${icon('plus')}Add box</button></div>
+      <div style="margin-bottom:8px"><b style="font-family:var(--disp)">Order boxes (fields)</b><div class="muted" style="font-size:12px">Quick add a ready box, then edit it. Each box can be required or optional.</div></div>
+      <div class="qa-row">${[['player', 'FF Player ID', 'bolt'], ['dropdown', 'Dropdown / package', 'grid'], ['image', 'Image upload', 'eye'], ['number', 'Number', 'money'], ['note', 'Note', 'edit'], ['blank', 'Blank box', 'plus']].map(([k, lbl, ic]) => `<button type="button" class="qa" data-qa="${k}">${icon(ic)}${lbl}</button>`).join('')}</div>
       <div id="fields-wrap">${s.fields.map(fieldEditor).join('')}</div>`,
       `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="svc-save">${icon('check')}Save product</button>`);
     $('#svc-save').addEventListener('click', saveService);
@@ -177,7 +178,7 @@
       <div class="grid2" style="margin-top:8px">
         <div class="field"><label>Box label</label><input data-ff="${i}:label" value="${esc(tl(f.label))}" placeholder="e.g. Player ID"></div>
         <div class="field"><label>Key (english, no space)</label><input data-ff="${i}:key" value="${esc(f.key || '')}" placeholder="auto"></div>
-        <div class="field"><label>Type</label><select data-ff="${i}:type">${['text', 'number', 'phone', 'select', 'textarea', 'date'].map((tp) => `<option value="${tp}" ${f.type === tp ? 'selected' : ''}>${tp}</option>`).join('')}</select></div>
+        <div class="field"><label>Type</label><select data-ff="${i}:type">${[['text', 'Single line text'], ['number', 'Number'], ['phone', 'Phone number'], ['select', 'Dropdown / package (choose one)'], ['textarea', 'Multi-line note'], ['date', 'Date'], ['image', 'Image upload (buyer attaches a picture)']].map(([tp, lbl]) => `<option value="${tp}" ${f.type === tp ? 'selected' : ''}>${lbl}</option>`).join('')}</select></div>
         <div class="field"><label>Placeholder</label><input data-ff="${i}:ph" value="${esc(f.ph || '')}"></div>
         <div class="field"><label class="flex" style="gap:6px;margin-top:24px"><input type="checkbox" data-ff="${i}:required" ${f.required ? 'checked' : ''} style="width:auto"> Required</label></div>
       </div>
@@ -359,7 +360,18 @@
     if (e.target.closest('[data-act="edit-cats"]')) { editCats(); return; }
     const es = e.target.closest('[data-edit-svc]'); if (es) { editService(es.dataset.editSvc); return; }
     const ds = e.target.closest('[data-del-svc]'); if (ds) { if (confirm('Delete this service?')) { const list = S.services.filter((x) => x.id !== ds.dataset.delSvc); const r = await api('/api/admin/services', { services: list }); if (r.ok) { S.services = list; toast('Deleted'); vServices(); } } return; }
-    if (e.target.closest('[data-act="add-field"]')) { readFieldsFromDom(); editing.fields.push({ key: '', type: 'text', required: false, label: { bn: '', en: '' } }); $('#fields-wrap').innerHTML = editing.fields.map(fieldEditor).join(''); return; }
+    if (e.target.closest('[data-act="add-field"]')) { readFieldsFromDom(); editing.fields.push({ key: '', type: 'text', required: false, label: '' }); $('#fields-wrap').innerHTML = editing.fields.map(fieldEditor).join(''); return; }
+    const qa = e.target.closest('[data-qa]'); if (qa) { readFieldsFromDom();
+      const presets = {
+        player: { key: 'player_id', type: 'number', required: true, label: 'Player ID', ph: 'XXXXXXXXX' },
+        dropdown: { key: 'package', type: 'select', required: true, label: 'Package', options: [{ label: 'Option 1', price: 0 }] },
+        image: { key: 'screenshot', type: 'image', required: false, label: 'Upload image (optional)' },
+        number: { key: 'qty', type: 'number', required: true, label: 'Quantity' },
+        note: { key: 'note', type: 'textarea', required: false, label: 'Note (optional)' },
+        blank: { key: '', type: 'text', required: false, label: '' },
+      };
+      editing.fields.push(JSON.parse(JSON.stringify(presets[qa.dataset.qa] || presets.blank)));
+      $('#fields-wrap').innerHTML = editing.fields.map(fieldEditor).join(''); return; }
     const delF = e.target.closest('[data-del-field]'); if (delF) { readFieldsFromDom(); editing.fields.splice(+delF.dataset.delField, 1); $('#fields-wrap').innerHTML = editing.fields.map(fieldEditor).join(''); return; }
     const addOpt = e.target.closest('[data-add-opt]'); if (addOpt) { readFieldsFromDom(); const fi = +addOpt.dataset.addOpt; editing.fields[fi].options = editing.fields[fi].options || []; editing.fields[fi].options.push({ label: '', price: undefined }); $('#fields-wrap').innerHTML = editing.fields.map(fieldEditor).join(''); return; }
     const delOpt = e.target.closest('[data-del-opt]'); if (delOpt) { readFieldsFromDom(); const [fi, oi] = delOpt.dataset.delOpt.split(':'); editing.fields[+fi].options.splice(+oi, 1); $('#fields-wrap').innerHTML = editing.fields.map(fieldEditor).join(''); return; }

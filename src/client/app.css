@@ -387,3 +387,13 @@ body{background:
 .ord-det .ic{width:15px;height:15px}
 .ord-det .ic:last-child{width:14px;transition:transform .2s}
 .ord-card:hover .ord-det .ic:last-child{transform:translateX(3px)}
+
+/* buyer image-upload field */
+.img-up{display:flex;align-items:center;gap:12px}
+.img-up-prev{width:60px;height:60px;border-radius:13px;background:var(--bg);border:1.5px dashed var(--line);display:grid;place-items:center;overflow:hidden;flex:none;color:var(--muted)}
+.img-up-prev .ic{width:24px;height:24px}
+.img-up-prev img{width:100%;height:100%;object-fit:cover}
+.img-up.has .img-up-prev{border-style:solid;border-color:var(--brand)}
+.img-up-btn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:7px;padding:11px 16px;border-radius:12px;background:color-mix(in srgb,var(--brand) 12%,#fff);color:var(--brand-d);font-weight:700;font-size:14px}
+.img-up-btn .ic{width:17px;height:17px}
+.img-up-btn[disabled]{opacity:.6}

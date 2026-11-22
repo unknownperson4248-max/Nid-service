@@ -250,6 +250,20 @@
       form.querySelector(`input[name="${key}"]`).value = btn.dataset.v;
       recalc();
     }));
+    // image upload fields: buyer attaches a picture
+    form.querySelectorAll('[data-imgup]').forEach((box) => {
+      const key = box.dataset.imgup, file = box.querySelector('input[type=file]'), prev = box.querySelector('.img-up-prev'), btn = box.querySelector('.img-up-btn');
+      btn.addEventListener('click', () => file.click());
+      file.addEventListener('change', async () => {
+        const f = file.files[0]; if (!f) return;
+        if (f.size > 3 * 1024 * 1024) { toast(S.lang === 'en' ? 'Max 3MB' : 'সর্বোচ্চ ৩MB'); return; }
+        const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(f); });
+        prev.innerHTML = '<div class="spin" style="width:20px;height:20px;margin:0"></div>'; btn.disabled = true;
+        const up = await api('/api/upload', { dataUrl }); btn.disabled = false;
+        if (up.ok) { form.querySelector(`input[name="${key}"]`).value = up.path; prev.innerHTML = `<img src="${esc(up.path)}" alt="">`; box.classList.add('has'); btn.innerHTML = `${icon('check')}${S.lang === 'en' ? 'Change' : 'বদলান'}`; }
+        else { prev.innerHTML = icon('images'); toast(S.lang === 'en' ? 'Upload failed' : 'আপলোড ব্যর্থ'); }
+      });
+    });
     form.addEventListener('submit', async (e) => { e.preventDefault(); await placeOrder(s, form); });
   }
   function fieldHtml(f) {
@@ -258,6 +272,11 @@
       <input type="hidden" name="${esc(f.key)}" value="">
       <div class="pk-grid" data-pkg="${esc(f.key)}">${(f.options || []).map((o) => `<button type="button" class="pk" data-pk="${esc(f.key)}" data-v="${esc(o.label)}"><span class="pk-l">${esc(o.label)}</span>${typeof o.price === 'number' ? `<span class="pk-p">${money(o.price)}</span>` : ''}</button>`).join('')}</div></div>`;
     if (f.type === 'textarea') return `<div class="field">${lbl}<textarea name="${esc(f.key)}" ${f.required ? 'required' : ''} maxlength="500" placeholder="${esc(f.ph || '')}"></textarea></div>`;
+    if (f.type === 'image') return `<div class="field">${lbl}
+      <input type="hidden" name="${esc(f.key)}" value="">
+      <div class="img-up" data-imgup="${esc(f.key)}"><div class="img-up-prev">${icon('images')}</div>
+        <button type="button" class="img-up-btn">${icon('plus')}${S.lang === 'en' ? 'Upload image' : 'ছবি দিন'}</button>
+        <input type="file" accept="image/*" hidden></div></div>`;
     const type = f.type === 'number' ? 'number' : f.type === 'phone' ? 'tel' : 'text';
     const extra = f.type === 'number' ? `inputmode="numeric" ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''}` : f.type === 'phone' ? 'inputmode="numeric" maxlength="11"' : 'maxlength="300"';
     return `<div class="field">${lbl}<input name="${esc(f.key)}" type="${type}" ${extra} ${f.required ? 'required' : ''} placeholder="${esc(f.ph || '')}"></div>`;
@@ -396,7 +415,7 @@
   /* ---------- order detail sheet ---------- */
   function orderSheet(o) {
     const svc = S.services.find((x) => x.id === o.svcId);
-    const rows = Object.entries(o.fields || {}).map(([k, val]) => { const f = svc && (svc.fields || []).find((x) => x.key === k); return `<div class="kv"><span class="k">${esc(f ? t(f.label) : k)}</span><span class="v">${esc(val)}</span></div>`; }).join('');
+    const rows = Object.entries(o.fields || {}).map(([k, val]) => { const f = svc && (svc.fields || []).find((x) => x.key === k); const isImg = /^\/img\/[a-z0-9]{10,24}$/.test(String(val)); return `<div class="kv"><span class="k">${esc(f ? t(f.label) : k)}</span>${isImg ? `<a class="v" href="${esc(val)}" target="_blank" rel="noopener"><img src="${esc(val)}" alt="" style="max-width:120px;max-height:120px;border-radius:10px;border:1px solid var(--line)"></a>` : `<span class="v">${esc(val)}</span>`}</div>`; }).join('');
     openSheet(`<div class="sheet-h"><h3>${esc(t(o.svcName))}</h3><button class="x" data-sheet-close>${icon('x')}</button></div>
       <div style="margin-bottom:12px">${statusBadge(o.status)}</div>
       <div class="kv"><span class="k">${u('orderId')}</span><span class="v">${esc(o.id)}</span></div>
