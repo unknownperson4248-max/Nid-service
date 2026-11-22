@@ -39,6 +39,7 @@
     total: { bn: 'মোট', en: 'Total' }, price: { bn: 'দাম', en: 'Price' }, from: { bn: 'শুরু', en: 'From' },
     login: { bn: 'লগইন', en: 'Login' }, register: { bn: 'রেজিস্টার', en: 'Register' }, logout: { bn: 'লগআউট', en: 'Logout' },
     name: { bn: 'নাম', en: 'Name' }, phone: { bn: 'মোবাইল নম্বর', en: 'Mobile number' }, password: { bn: 'পাসওয়ার্ড', en: 'Password' },
+    email: { bn: 'ইমেইল', en: 'Email' }, phoneOpt: { bn: 'মোবাইল নম্বর (ঐচ্ছিক)', en: 'Mobile number (optional)' }, emailOrPhone: { bn: 'ইমেইল বা ফোন', en: 'Email or phone' }, orDiv: { bn: 'অথবা', en: 'or' }, gLogin: { bn: 'Google দিয়ে চালিয়ে যান', en: 'Continue with Google' },
     refOpt: { bn: 'রেফার কোড (ঐচ্ছিক)', en: 'Referral code (optional)' }, haveAcc: { bn: 'অ্যাকাউন্ট আছে?', en: 'Have an account?' },
     noAcc: { bn: 'অ্যাকাউন্ট নেই?', en: 'No account?' }, status: { bn: 'স্ট্যাটাস', en: 'Status' }, time: { bn: 'সময়', en: 'Time' },
     customer: { bn: 'কাস্টমার', en: 'Customer' }, pending: { bn: 'পেন্ডিং', en: 'Pending' }, done: { bn: 'সম্পন্ন', en: 'Done' },
@@ -55,7 +56,7 @@
     orderId: { bn: 'অর্ডার আইডি', en: 'Order ID' }, support: { bn: 'সাপোর্ট', en: 'Support' }, needHelp: { bn: 'সাহায্য লাগবে?', en: 'Need help?' },
     viewAll: { bn: 'সব দেখুন', en: 'View all' }, min: { bn: 'সর্বনিম্ন', en: 'Min' }, service: { bn: 'সার্ভিস', en: 'Service' },
     welcome: { bn: 'স্বাগতম', en: 'Welcome' }, loginSub: { bn: 'লগইন করে সার্ভিস নিন', en: 'Log in to use the services' },
-    wrong: { bn: 'নম্বর বা পাসওয়ার্ড ভুল', en: 'Wrong number or password' }, exists: { bn: 'এই নম্বরে অ্যাকাউন্ট আছে', en: 'This number already has an account' },
+    wrong: { bn: 'ইমেইল/নম্বর বা পাসওয়ার্ড ভুল', en: 'Wrong email/number or password' }, exists: { bn: 'এই ইমেইলে অ্যাকাউন্ট আছে', en: 'This email already has an account' },
     fillAll: { bn: 'সব ঘর পূরণ করুন', en: 'Fill all fields' }, details: { bn: 'ডিটেইলস', en: 'Details' },
   };
   let S = { user: null, settings: null, services: [], cats: [], notices: [], live: [], lang: localStorage.getItem('lang') || 'bn', route: 'home', param: '', drawer: false, homeCat: '__all' };
@@ -87,10 +88,11 @@
       <div class="auth-tabs"><button data-am="login" class="${authMode === 'login' ? 'on' : ''}">${u('login')}</button><button data-am="register" class="${authMode === 'register' ? 'on' : ''}">${u('register')}</button></div>
       <div id="auth-err"></div>
       <form id="auth-form">
-        ${authMode === 'register' ? `<div class="field"><label>${u('name')}</label><input name="name" autocomplete="name" maxlength="60" required></div>` : ''}
-        <div class="field"><label>${u('phone')}</label><input name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="01XXXXXXXXX" maxlength="11" required></div>
+        ${authMode === 'register' ? `<div class="field"><label>${u('name')}</label><input name="name" autocomplete="name" maxlength="60" required></div>
+        <div class="field"><label>${u('email')}</label><input name="email" type="email" autocomplete="email" inputmode="email" placeholder="you@gmail.com" maxlength="120" required></div>` : `<div class="field"><label>${u('emailOrPhone')}</label><input name="id" type="text" autocomplete="username" placeholder="you@gmail.com" maxlength="120" required></div>`}
         <div class="field"><label>${u('password')}</label><input name="password" type="password" autocomplete="${authMode === 'register' ? 'new-password' : 'current-password'}" minlength="6" maxlength="100" required></div>
-        ${authMode === 'register' ? `<div class="field"><label>${u('refOpt')}</label><input name="ref" maxlength="10" placeholder="ABC123"></div>` : ''}
+        ${authMode === 'register' ? `<div class="field"><label>${u('phoneOpt')}</label><input name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="01XXXXXXXXX" maxlength="11"></div>
+        <div class="field"><label>${u('refOpt')}</label><input name="ref" maxlength="10" placeholder="ABC123"></div>` : ''}
         <button class="btn" type="submit">${authMode === 'login' ? u('login') : u('register')}${icon('right')}</button>
       </form>
       <p style="text-align:center;margin-top:16px;color:var(--muted);font-size:13.5px">${authMode === 'login' ? u('noAcc') : u('haveAcc')}
@@ -102,7 +104,12 @@
   async function doAuth(form) {
     const d = Object.fromEntries(new FormData(form));
     const errEl = $('#auth-err');
-    if ((d.phone || '').length !== 11 || !/^01\d{9}$/.test(d.phone)) { errEl.innerHTML = `<div class="err-msg">${S.lang === 'en' ? 'Enter a valid 11-digit number' : 'সঠিক ১১ ডিজিটের নম্বর দিন'}</div>`; return; }
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (authMode === 'register') {
+      if (!(d.name || '').trim() || !emailRe.test(d.email || '')) { errEl.innerHTML = `<div class="err-msg">${S.lang === 'en' ? 'Enter your name and a valid email' : 'নাম ও সঠিক ইমেইল দিন'}</div>`; return; }
+      if ((d.phone || '').trim() && !/^01\d{9}$/.test(d.phone.trim())) { errEl.innerHTML = `<div class="err-msg">${S.lang === 'en' ? 'Enter a valid 11-digit number' : 'সঠিক ১১ ডিজিটের নম্বর দিন'}</div>`; return; }
+    } else if (!(d.id || '').trim()) { errEl.innerHTML = `<div class="err-msg">${u('fillAll')}</div>`; return; }
+    if ((d.password || '').length < 6) { errEl.innerHTML = `<div class="err-msg">${S.lang === 'en' ? 'Password at least 6 characters' : 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষর'}</div>`; return; }
     const btn = $('#auth-form .btn'); btn.disabled = true;
     const r = await api('/api/auth/' + authMode, d);
     btn.disabled = false;
@@ -491,6 +498,7 @@
       <div id="pf-msg"></div>
       <form id="pf-form" class="card card-pad" style="margin-top:14px">
         <div class="field"><label>${u('name')}</label><input name="name" value="${esc(S.user.name)}" maxlength="60"></div>
+        <div class="field"><label>${u('email')}</label><input name="email" type="email" value="${esc(S.user.email || '')}" maxlength="120" placeholder="you@gmail.com"></div>
         <div class="field"><label>${u('newPass')} <span class="hint">(${S.lang === 'en' ? 'leave blank to keep' : 'না বদলালে খালি রাখুন'})</span></label><input name="password" type="password" minlength="6" maxlength="100" autocomplete="new-password"></div>
         <button class="btn" type="submit">${icon('check')}${u('save')}</button>
       </form>

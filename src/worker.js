@@ -35,6 +35,7 @@ const rid = (n = 10) => { const a = new Uint8Array(n); crypto.getRandomValues(a)
 const now = () => Date.now();
 const sortKey = (ts) => String(9e15 - ts).padStart(16, '0') + ':' + rid(4);
 const PHONE_RE = /^01[0-9]{9}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 async function pbkdf2(pw, salt, iter) {
   const key = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveBits']);
@@ -88,25 +89,28 @@ async function userFromReq(req, env) {
   u._token = m[1];
   return u;
 }
-const pubUser = (u) => ({ id: u.id, name: u.name, phone: u.phone, balance: u.balance || 0, role: u.role || 'user', ref: u.ref, ts: u.ts });
+const pubUser = (u) => ({ id: u.id, name: u.name, phone: u.phone || '', email: u.email || '', balance: u.balance || 0, role: u.role || 'user', ref: u.ref, ts: u.ts });
 
 async function handleAuth(req, env, url, path, secure) {
   const ip = req.headers.get('cf-connecting-ip') || 'x';
   if (path === '/api/auth/register' && req.method === 'POST') {
     let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
-    const name = clip(b.name, 60), phone = clip(b.phone, 14), pw = String(b.password || '');
-    if (!name || !PHONE_RE.test(phone) || pw.length < 6 || pw.length > 100) return json({ ok: false, error: 'invalid' }, 400);
+    const name = clip(b.name, 60), email = clip(b.email, 120).toLowerCase(), pw = String(b.password || ''), phone = clip(b.phone, 14);
+    if (!name || !EMAIL_RE.test(email) || pw.length < 6 || pw.length > 100) return json({ ok: false, error: 'invalid' }, 400);
+    if (phone && !PHONE_RE.test(phone)) return json({ ok: false, error: 'invalid' }, 400);
     // rate limit registrations per IP
     const rk = 'rl:reg:' + (await sha(ip)); const rn = +((await env.DATA.get(rk)) || 0);
     if (rn >= 20) return json({ ok: false, error: 'too_many' }, 429);
     await env.DATA.put(rk, String(rn + 1), { expirationTtl: 3600 });
-    if (await env.DATA.get('phone:' + phone)) return json({ ok: false, error: 'exists' }, 409);
+    if (await env.DATA.get('email:' + email)) return json({ ok: false, error: 'exists' }, 409);
+    if (phone && await env.DATA.get('phone:' + phone)) return json({ ok: false, error: 'exists' }, 409);
     const anyUser = (await env.DATA.list({ prefix: 'u:', limit: 1 })).keys.length > 0;
     const salt = rid(16);
-    const u = { id: rid(12), name, phone, salt, iter: PBKDF2_ITER, hash: await pbkdf2(pw, salt, PBKDF2_ITER),
+    const u = { id: rid(12), name, email, phone: phone || '', salt, iter: PBKDF2_ITER, hash: await pbkdf2(pw, salt, PBKDF2_ITER),
       balance: 0, role: anyUser ? 'user' : 'admin', ref: rid(6).toUpperCase(), refBy: clip(b.ref, 10).toUpperCase() || '', ts: now() };
     await env.DATA.put('u:' + u.id, JSON.stringify(u));
-    await env.DATA.put('phone:' + phone, u.id);
+    await env.DATA.put('email:' + email, u.id);
+    if (phone) await env.DATA.put('phone:' + phone, u.id);
     if (u.ref) await env.DATA.put('ref:' + u.ref, u.id);
     const tok = rid(28);
     await env.DATA.put('sess:' + tok, JSON.stringify({ uid: u.id, ts: now() }), { expirationTtl: SESSION_DAYS * 86400 });
@@ -114,10 +118,13 @@ async function handleAuth(req, env, url, path, secure) {
   }
   if (path === '/api/auth/login' && req.method === 'POST') {
     let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
-    const phone = clip(b.phone, 14), pw = String(b.password || '');
+    const idRaw = clip(b.id || b.email || b.phone, 120), pw = String(b.password || '');
     const rk = 'rl:login:' + (await sha(ip)); const rn = +((await env.DATA.get(rk)) || 0);
     if (rn >= 15) return json({ ok: false, error: 'too_many' }, 429);
-    const uid = await env.DATA.get('phone:' + phone);
+    let uid = idRaw.includes('@')
+      ? await env.DATA.get('email:' + idRaw.toLowerCase())
+      : await env.DATA.get('phone:' + clip(idRaw, 14));
+    if (!uid) uid = (await env.DATA.get('email:' + idRaw.toLowerCase())) || (await env.DATA.get('phone:' + clip(idRaw, 14)));
     const u = uid ? await env.DATA.get('u:' + uid, 'json') : null;
     const ok = u && !u.blocked && (await pbkdf2(pw, u.salt, u.iter || PBKDF2_ITER)) === u.hash;
     if (!ok) { await env.DATA.put(rk, String(rn + 1), { expirationTtl: 900 }); await new Promise((r) => setTimeout(r, 400)); return json({ ok: false, error: 'wrong' }, 401); }
@@ -259,6 +266,16 @@ async function handleApi(req, env, url, path, u, secure) {
     let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
     const fresh = await env.DATA.get('u:' + u.id, 'json');
     if (b.name) fresh.name = clip(b.name, 60);
+    if (typeof b.email === 'string') {
+      const email = clip(b.email, 120).toLowerCase();
+      if (email && !EMAIL_RE.test(email)) return json({ ok: false, error: 'invalid' }, 400);
+      if (email !== (fresh.email || '')) {
+        if (email) { const taken = await env.DATA.get('email:' + email); if (taken && taken !== u.id) return json({ ok: false, error: 'exists' }, 409); }
+        if (fresh.email) await env.DATA.delete('email:' + fresh.email);
+        if (email) await env.DATA.put('email:' + email, u.id);
+        fresh.email = email;
+      }
+    }
     if (b.password) {
       if (String(b.password).length < 6) return json({ ok: false, error: 'short' }, 400);
       fresh.salt = rid(16); fresh.hash = await pbkdf2(String(b.password), fresh.salt, PBKDF2_ITER); fresh.iter = PBKDF2_ITER;

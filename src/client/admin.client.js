@@ -35,7 +35,7 @@
   function renderLogin(err) {
     root.innerHTML = `<div class="login"><form class="login-card" id="lf"><div class="mark">${icon('lock')}</div><h2>Admin Login</h2><p>WizeFF TopUp</p>
       ${err ? `<div class="err">${esc(err)}</div>` : ''}
-      <div class="field"><label>Mobile number</label><input name="phone" type="tel" inputmode="numeric" maxlength="11" placeholder="01XXXXXXXXX" required></div>
+      <div class="field"><label>Email or phone</label><input name="id" type="text" autocomplete="username" maxlength="120" placeholder="you@gmail.com" required></div>
       <div class="field"><label>Password</label><input name="password" type="password" required></div>
       <button class="btn" style="width:100%">${icon('lock')}Login</button></form></div>`;
     $('#lf').addEventListener('submit', async (e) => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); const r = await api('/api/auth/login', d); if (r.ok && r.user.role === 'admin') { S.me = r.user; renderShell(); go('dash'); } else if (r.ok) renderNoAdmin(); else renderLogin('Wrong number or password'); });
@@ -274,7 +274,7 @@
     const c = $('#content'); c.innerHTML = '<div class="spin"></div>';
     const r = await api('/api/admin/users'); const items = r.items || [];
     c.innerHTML = `<div class="card"><table class="tbl"><thead><tr><th>Name</th><th>Phone</th><th>Balance</th><th>Role</th><th></th></tr></thead><tbody>
-      ${items.map((x) => `<tr><td><b>${esc(x.name)}</b> ${x.blocked ? '<span class="pill">blocked</span>' : ''}<div class="muted mono">${esc(x.ref)}</div></td><td class="mono">${esc(x.phone)}</td><td><b>${money(x.balance)}</b></td><td>${x.role === 'admin' ? '<span class="badge b-approved">admin</span>' : 'user'}</td>
+      ${items.map((x) => `<tr><td><b>${esc(x.name)}</b> ${x.blocked ? '<span class="pill">blocked</span>' : ''}<div class="muted mono">${esc(x.ref)}</div></td><td class="mono">${x.email ? esc(x.email) : ''}${x.email && x.phone ? '<br>' : ''}${x.phone ? esc(x.phone) : ''}${!x.email && !x.phone ? '—' : ''}</td><td><b>${money(x.balance)}</b></td><td>${x.role === 'admin' ? '<span class="badge b-approved">admin</span>' : 'user'}</td>
         <td><button class="btn btn-ghost btn-sm" data-user='${esc(JSON.stringify(x))}'>${icon('edit')}Manage</button></td></tr>`).join('')}
     </tbody></table></div>`;
   }
