@@ -47,10 +47,16 @@ async function sha(v) {
 }
 
 /* ---------------- data access ---------------- */
+// migrate an old single-number method {number,type} into the numbers[] shape
+function migrateMethod(m) {
+  if (Array.isArray(m.numbers)) return m;
+  const numbers = m.number ? [{ id: rid(8), label: '', number: m.number, type: m.type || 'Personal', min: 0, max: null, active: true, hidden: false }] : [];
+  return { id: m.id, label: m.label, color: m.color, active: m.active !== false, numbers };
+}
 async function getSettings(env) {
   const s = (await env.DATA.get('settings', 'json')) || {};
   return { ...DEFAULT_SETTINGS, ...s, tagline: { ...DEFAULT_SETTINGS.tagline, ...(s.tagline || {}) },
-    depositMethods: Array.isArray(s.depositMethods) ? s.depositMethods : DEFAULT_SETTINGS.depositMethods };
+    depositMethods: (Array.isArray(s.depositMethods) ? s.depositMethods : DEFAULT_SETTINGS.depositMethods).map(migrateMethod) };
 }
 async function getServices(env) {
   const s = await env.DATA.get('services', 'json');
@@ -226,11 +232,11 @@ async function handleApi(req, env, url, path, u, secure) {
 
   if (path === '/api/deposit' && req.method === 'POST') {
     let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
-    const method = clip(b.method, 20), sender = clip(b.sender, 14), trxid = clip(b.trxid, 40), amount = Math.round(toNum(b.amount));
+    const method = clip(b.method, 20), toNumber = clip(b.toNumber, 20), sender = clip(b.sender, 14), trxid = clip(b.trxid, 40), amount = Math.round(toNum(b.amount));
     if (!method || !PHONE_RE.test(sender) || trxid.length < 4 || !(amount >= (settings.minDeposit || 20) && amount <= 100000))
       return json({ ok: false, error: 'invalid' }, 400);
     const ts = now(), id = 'DP' + String(ts).slice(-8) + rid(2).toUpperCase();
-    const dep = { id, uid: u.id, uname: u.name, method, sender, trxid, amount, status: 'pending', ts };
+    const dep = { id, uid: u.id, uname: u.name, method, toNumber, sender, trxid, amount, status: 'pending', ts };
     const key = 'dep:' + sortKey(ts);
     await env.DATA.put(key, JSON.stringify(dep), { metadata: { id, uid: u.id, status: 'pending', ts, amt: amount, un: maskName(u.name), method } });
     const dl = (await env.DATA.get('udep:' + u.id, 'json')) || [];
@@ -265,8 +271,13 @@ async function handleApi(req, env, url, path, u, secure) {
 }
 
 const maskName = (n) => { const s = String(n || '').trim(); return s.length <= 2 ? s : s.slice(0, Math.max(2, s.length - 3)) + '***'; };
+// customers only see active methods, and only active + not-hidden numbers inside them
+function pubMethods(list) {
+  return (list || []).filter((m) => m.active !== false).map((m) => ({ id: m.id, label: m.label, color: m.color,
+    numbers: (m.numbers || []).filter((n) => n.active !== false && !n.hidden).map((n) => ({ id: n.id, label: n.label, number: n.number, type: n.type, min: n.min, max: n.max })) }));
+}
 const pubSettings = (s) => ({ texts: cleanTexts(s.texts), layout: cleanLayout(s.layout), brandA: s.brandA, brandB: s.brandB, logo: safeImg(s.logo), themeColor: safeHex(s.themeColor), tagline: s.tagline, currency: s.currency, minDeposit: s.minDeposit,
-  depositMethods: s.depositMethods, referralBonus: s.referralBonus, whatsapp: s.whatsapp });
+  depositMethods: pubMethods(s.depositMethods), referralBonus: s.referralBonus, whatsapp: s.whatsapp });
 async function bumpStat(env, k) { const key = 'stat:' + k; const n = +((await env.DATA.get(key)) || 0); await env.DATA.put(key, String(n + 1)); }
 
 /* ---------------- admin APIs ---------------- */
@@ -419,6 +430,16 @@ async function handleAdmin(req, env, url, path, u) {
       next.themeColor = safeHex(next.themeColor); next.logo = safeImg(next.logo);
       next.texts = cleanTexts(next.texts); next.layout = cleanLayout(next.layout);
       next.seoTitle = clip(next.seoTitle, 90); next.seoDesc = clip(next.seoDesc, 300);
+      const hexish = (v, fallback) => (/^#[0-9a-f]{3,8}$/i.test(String(v || '')) ? String(v) : fallback);
+      if (Array.isArray(next.depositMethods)) next.depositMethods = next.depositMethods.slice(0, 12).map((m) => ({
+        id: clip(m.id, 20) || rid(8), label: clip(m.label, 30), color: hexish(m.color, '#0f766e'), active: m.active !== false,
+        numbers: Array.isArray(m.numbers) ? m.numbers.slice(0, 20).map((n) => ({
+          id: clip(n.id, 20) || rid(8), label: clip(n.label, 30), number: clip(n.number, 20), type: clip(n.type, 20) || 'Personal',
+          min: n.min != null && n.min !== '' ? Math.max(0, Math.round(toNum(n.min)) || 0) : 0,
+          max: n.max != null && n.max !== '' && Number.isFinite(toNum(n.max)) ? Math.max(0, Math.round(toNum(n.max))) : null,
+          active: n.active !== false, hidden: !!n.hidden,
+        })) : [],
+      }));
       await env.DATA.put('settings', JSON.stringify(next));
       return json({ ok: true });
     }

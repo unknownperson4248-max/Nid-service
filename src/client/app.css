@@ -403,3 +403,23 @@ body{background:
 .svc-hero-t{flex:1;min-width:0}
 .svc-price{flex:none;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.35);color:#fff;font-family:var(--disp);font-weight:800;font-size:19px;padding:8px 14px;border-radius:14px;display:flex;flex-direction:column;align-items:center;line-height:1.05;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
 .svc-price small{font-size:10px;font-weight:600;opacity:.85}
+
+/* add-money: step 1 (amount) and step 2 (method tabs) */
+.dep-amt-card{text-align:center;padding:26px 20px}
+.dep-amt-icon{width:58px;height:58px;border-radius:16px;background:linear-gradient(135deg,var(--brand2),var(--brand));color:#fff;display:grid;place-items:center;margin:0 auto 14px}
+.dep-amt-icon .ic{width:28px;height:28px}
+.dep-amt-card h3{font-size:19px;margin-bottom:4px}
+.dep-amt-card .muted{font-size:13px;margin-bottom:14px}
+.dep-range{display:inline-block;background:color-mix(in srgb,var(--brand) 10%,#fff);color:var(--brand-d);font-weight:700;font-size:13px;padding:7px 14px;border-radius:999px;margin-bottom:16px}
+#dep-amt-input{text-align:center;font-family:var(--disp);font-size:22px;font-weight:700;margin-bottom:12px}
+.dep-sum{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.94);border:1px solid var(--glass-brd);border-radius:16px;padding:13px 16px;margin-bottom:16px;box-shadow:var(--glass-sh)}
+.dep-sum span{color:var(--muted);font-size:13px}
+.dep-sum b{font-family:var(--disp);font-size:19px;color:var(--brand-d)}
+.dep-sum button{all:unset;cursor:pointer;margin-left:auto;color:var(--brand);font-weight:700;font-size:13.5px;text-decoration:underline}
+.pm-tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;scrollbar-width:none}
+.pm-tabs::-webkit-scrollbar{display:none}
+.pm-tab{all:unset;box-sizing:border-box;flex:none;cursor:pointer;display:flex;align-items:center;gap:7px;padding:10px 15px;border-radius:13px;background:#fff;border:1.5px solid var(--line);font-weight:700;font-size:13.5px;color:var(--ink);white-space:nowrap}
+.pm-tab-dot{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
+.pm-tab.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 10%,#fff);box-shadow:0 6px 14px -9px var(--c)}
+.pm-tab.na{opacity:.55}
+.pm-tab small{font-weight:600;font-size:10px;color:var(--bad)}

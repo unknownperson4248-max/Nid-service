@@ -325,50 +325,79 @@
 
   /* ---------- deposit / add money ---------- */
   async function viewDeposit(v) {
-    const methods = (S.settings.depositMethods || []).filter((m) => m.number);
-    const min = S.settings.minDeposit || 20;
-    const chips = [50, 100, 200, 500, 1000, 2000].filter((a) => a >= min);
+    const methods = (S.settings.depositMethods || []).filter((m) => (m.numbers || []).some((n) => n.number));
+    const min = S.settings.minDeposit || 20, max = 100000;
     const en = S.lang === 'en';
-    v.innerHTML = `<div class="ph"><button class="back" data-back>${icon('left')}</button><div><h2>${u('addMoney')}</h2><div class="sub">${u('walletBalance')}: ${money(S.user.balance)}</div></div></div>
+    let amount = null, activeTab = 0;
+    const pickNumber = (m, amt) => { const nums = (m.numbers || []).filter((n) => n.number); if (amt == null) return nums[0] || null; return nums.find((n) => amt >= (n.min || 0) && (n.max == null || amt <= n.max)) || null; };
 
-      <div class="card card-pad" style="margin-bottom:14px">
-        <div class="fld-lbl">${en ? 'Amount' : 'এমাউন্ট'} <span class="req">*</span></div>
-        <div class="amt-chips">${chips.map((a) => `<button type="button" class="amt" data-amt="${a}">${money(a)}</button>`).join('')}</div>
-        <input id="dep-amt" type="number" inputmode="numeric" min="${min}" placeholder="${en ? 'Or type amount' : 'অথবা এমাউন্ট লিখুন'} (${u('min')} ${money(min)})">
-      </div>
+    async function loadHistory() {
+      const dr = await api('/api/deposits'); const el = $('#dep-list'); if (!el) return;
+      el.innerHTML = (dr.items && dr.items.length) ? dr.items.map((d) => `<div class="ord-row"><span class="ord-av">${icon('wallet')}</span><span class="ord-main"><b>${money(d.amount)} • ${esc(d.method)}</b><small>${d.id} • ${ago(d.ts)}</small></span>${statusBadge(d.status === 'pending' ? 'pending' : d.status === 'approved' ? 'approved' : 'rejected')}</div>`).join('') : emptyBox(u('noOrders'));
+    }
 
-      <div class="pay-lbl">${en ? 'Pay with' : 'যেভাবে পেমেন্ট করবেন'} <span class="req">*</span></div>
-      ${methods.length ? `<div class="pay-methods">${methods.map((m, i) => `<button type="button" class="pay-m" data-m="${i}" style="--c:${m.color || 'var(--brand)'}">
-        <span class="pay-badge">${esc((m.label || '?').slice(0, 2))}</span><span class="pay-nm"><b>${esc(m.label)}</b><small>${esc(m.type || 'Personal')}</small></span><span class="pay-check">${icon('check')}</span></button>`).join('')}</div>
-      <div id="pay-detail"></div>` : `<div class="notice urgent"><div class="notice-b">${en ? 'Payment numbers not set yet. Contact support.' : 'পেমেন্ট নম্বর এখনো সেট করা হয়নি। সাপোর্টে যোগাযোগ করুন।'}</div></div>`}
+    function renderPanel() {
+      const panel = $('#pm-panel'), form = $('#dep-form'); if (!panel || !methods.length) return;
+      const m = methods[activeTab]; if (!m) return;
+      const num = pickNumber(m, amount);
+      if (num) {
+        form.hidden = false;
+        form.querySelector('[name=method]').value = m.label; form.querySelector('[name=toNumber]').value = num.number;
+        panel.innerHTML = `<div class="pay-detail" style="--c:${m.color || 'var(--brand)'}">
+          <div class="pay-steps"><span>1 ${en ? 'Send Money' : 'টাকা পাঠান'}</span><span>2 ${en ? 'Copy TrxID' : 'TrxID কপি'}</span><span>3 ${en ? 'Submit' : 'সাবমিট'}</span></div>
+          <div class="pay-num-lbl">${esc(m.label)}${num.label ? ' · ' + esc(num.label) : ''} (${esc(num.type || 'Personal')}) ${en ? 'number' : 'নম্বর'}</div>
+          <div class="pay-num"><b>${esc(num.number)}</b><button type="button" class="pay-copy" data-copy="${esc(num.number)}">${icon('copy')}${u('copy')}</button></div>
+          <p class="pay-hint">${u('depositNote')}</p></div>`;
+      } else {
+        form.hidden = true;
+        panel.innerHTML = `<div class="notice urgent"><div class="notice-b">${en ? `${m.label} is not available for ${money(amount)}. Try a different amount or method.` : `${esc(m.label)} দিয়ে ${money(amount)} পাঠানো যাচ্ছে না। অন্য এমাউন্ট বা মাধ্যম ব্যবহার করুন।`}</div></div>`;
+      }
+    }
 
-      <div id="dep-err" style="margin-top:14px"></div>
-      <form id="dep-form" class="card card-pad">
-        <input type="hidden" name="method" value=""><input type="hidden" name="amount" value="">
-        <div class="field"><label>${u('senderNo')} <span class="req">*</span></label><input name="sender" type="tel" inputmode="numeric" maxlength="11" placeholder="01XXXXXXXXX" required></div>
-        <div class="field"><label>${u('trxid')} <span class="req">*</span></label><input name="trxid" maxlength="40" placeholder="TrxID" required></div>
-        <button class="btn" type="submit">${icon('check')}${u('submit')}</button>
-      </form>
-      <div class="sec-h">${icon('clock')}${en ? 'Deposit history' : 'ডিপোজিট হিস্টোরি'}</div>
-      <div class="card" id="dep-list"><div class="spin"></div></div><div style="height:10px"></div>`;
-
-    const form = $('#dep-form'), amtInput = $('#dep-amt');
-    const setAmt = (a) => { form.querySelector('[name=amount]').value = a || ''; };
-    $$('.amt').forEach((b) => b.addEventListener('click', () => { $$('.amt').forEach((x) => x.classList.remove('on')); b.classList.add('on'); amtInput.value = b.dataset.amt; setAmt(b.dataset.amt); }));
-    amtInput.addEventListener('input', () => { $$('.amt').forEach((x) => x.classList.toggle('on', x.dataset.amt === amtInput.value)); setAmt(amtInput.value); });
-    $$('.pay-m').forEach((b) => b.addEventListener('click', () => {
-      $$('.pay-m').forEach((x) => x.classList.remove('on')); b.classList.add('on');
-      const m = methods[+b.dataset.m]; form.querySelector('[name=method]').value = m.label;
-      $('#pay-detail').innerHTML = `<div class="pay-detail" style="--c:${m.color || 'var(--brand)'}">
-        <div class="pay-steps"><span>1 ${en ? 'Send Money' : 'Send Money'}</span><span>2 ${en ? 'Copy TrxID' : 'TrxID কপি'}</span><span>3 ${en ? 'Submit' : 'সাবমিট'}</span></div>
-        <div class="pay-num-lbl">${esc(m.label)} (${esc(m.type || 'Personal')}) ${en ? 'number' : 'নম্বর'}</div>
-        <div class="pay-num"><b>${esc(m.number)}</b><button type="button" class="pay-copy" data-copy="${esc(m.number)}">${icon('copy')}${u('copy')}</button></div>
-        <p class="pay-hint">${u('depositNote')}</p></div>`;
-      $('#pay-detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }));
-    form.addEventListener('submit', async (e) => { e.preventDefault(); await submitDeposit(e.target); });
-    const dr = await api('/api/deposits');
-    const el = $('#dep-list'); if (el) el.innerHTML = (dr.items && dr.items.length) ? dr.items.map((d) => `<div class="ord-row"><span class="ord-av">${icon('wallet')}</span><span class="ord-main"><b>${money(d.amount)} • ${esc(d.method)}</b><small>${d.id} • ${ago(d.ts)}</small></span>${statusBadge(d.status === 'pending' ? 'pending' : d.status === 'approved' ? 'approved' : 'rejected')}</div>`).join('') : emptyBox(u('noOrders'));
+    function renderStep() {
+      if (amount == null) {
+        v.innerHTML = `<div class="ph"><button class="back" data-back>${icon('left')}</button><h2>${u('addMoney')}</h2></div>
+          <div class="card card-pad dep-amt-card">
+            <div class="dep-amt-icon">${icon('wallet')}</div>
+            <h3>${en ? 'Add money to wallet' : 'ওয়ালেটে টাকা যোগ করুন'}</h3>
+            <p class="muted">${en ? 'Send money to the number and enter the transaction ID' : 'নম্বরে টাকা পাঠিয়ে ট্রানজ্যাকশন আইডি দিন'}</p>
+            <div class="dep-range">${en ? 'Min' : 'সর্বনিম্ন'} ${money(min)} — ${en ? 'Max' : 'সর্বোচ্চ'} ${money(max)}</div>
+            <input id="dep-amt-input" type="number" inputmode="numeric" placeholder="${en ? 'Enter amount' : 'টাকার পরিমাণ লিখুন'}">
+            <div id="dep-amt-err"></div>
+            <button class="btn" id="dep-amt-next">${en ? 'Continue' : 'ঠিক আছে, এগিয়ে যান'}</button>
+          </div>
+          <div class="sec-h">${icon('clock')}${en ? 'Deposit history' : 'ডিপোজিট হিস্টোরি'}</div>
+          <div class="card" id="dep-list"><div class="spin"></div></div><div style="height:10px"></div>`;
+        $('#dep-amt-next').addEventListener('click', () => {
+          const val = Math.round(Number($('#dep-amt-input').value));
+          if (!Number.isFinite(val) || val < min || val > max) { $('#dep-amt-err').innerHTML = `<div class="err-msg">${en ? `Enter an amount between ${money(min)} and ${money(max)}` : `${money(min)} থেকে ${money(max)} এর মধ্যে এমাউন্ট লিখুন`}</div>`; return; }
+          amount = val; activeTab = Math.max(0, methods.findIndex((m) => pickNumber(m, amount))); renderStep();
+        });
+        $('#dep-amt-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#dep-amt-next').click(); });
+        loadHistory();
+        return;
+      }
+      v.innerHTML = `<div class="ph"><button class="back" data-back>${icon('left')}</button><h2>${u('addMoney')}</h2></div>
+        <div class="dep-sum"><span>${en ? 'Amount' : 'এমাউন্ট'}</span><b>${money(amount)}</b><button type="button" id="dep-change-amt">${en ? 'Change' : 'পরিবর্তন'}</button></div>
+        ${methods.length ? `<div class="pay-lbl">${en ? 'Which method?' : 'কোন মাধ্যমে পাঠাবেন?'}</div>
+        <div class="pm-tabs">${methods.map((m, i) => { const avail = !!pickNumber(m, amount); return `<button type="button" class="pm-tab ${i === activeTab ? 'on' : ''} ${avail ? '' : 'na'}" data-tab="${i}" style="--c:${m.color || 'var(--brand)'}"><span class="pm-tab-dot"></span>${esc(m.label)}${avail ? '' : `<small>${en ? 'unavailable' : 'অনুপলব্ধ'}</small>`}</button>`; }).join('')}</div>
+        <div id="pm-panel"></div>` : `<div class="notice urgent"><div class="notice-b">${en ? 'Payment numbers not set yet. Contact support.' : 'পেমেন্ট নম্বর এখনো সেট করা হয়নি। সাপোর্টে যোগাযোগ করুন।'}</div></div>`}
+        <div id="dep-err" style="margin-top:14px"></div>
+        <form id="dep-form" class="card card-pad" ${methods.length ? '' : 'hidden'}>
+          <input type="hidden" name="method" value=""><input type="hidden" name="toNumber" value=""><input type="hidden" name="amount" value="${amount}">
+          <div class="field"><label>${u('senderNo')} <span class="req">*</span></label><input name="sender" type="tel" inputmode="numeric" maxlength="11" placeholder="01XXXXXXXXX" required></div>
+          <div class="field"><label>${u('trxid')} <span class="req">*</span></label><input name="trxid" maxlength="40" placeholder="TrxID" required></div>
+          <button class="btn" type="submit">${icon('check')}${u('submit')}</button>
+        </form>
+        <div class="sec-h">${icon('clock')}${en ? 'Deposit history' : 'ডিপোজিট হিস্টোরি'}</div>
+        <div class="card" id="dep-list"><div class="spin"></div></div><div style="height:10px"></div>`;
+      renderPanel();
+      $$('.pm-tab').forEach((b) => b.addEventListener('click', () => { activeTab = +b.dataset.tab; $$('.pm-tab').forEach((x) => x.classList.remove('on')); b.classList.add('on'); renderPanel(); }));
+      const back = $('#dep-change-amt'); if (back) back.addEventListener('click', () => { amount = null; renderStep(); });
+      $('#dep-form').addEventListener('submit', async (e) => { e.preventDefault(); await submitDeposit(e.target); });
+      loadHistory();
+    }
+    renderStep();
   }
   async function submitDeposit(form) {
     const d = Object.fromEntries(new FormData(form)); const errEl = $('#dep-err');

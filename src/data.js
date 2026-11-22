@@ -12,9 +12,10 @@ export const DEFAULT_SETTINGS = {
   currency: '৳',
   referralBonus: 10, // credited to referrer when a referred user's first deposit is approved
   minDeposit: 20,
+  // each payment method can hold several receiving numbers, picked by amount range
   depositMethods: [
-    { id: 'bkash', label: 'bKash', number: '', type: 'Personal', color: '#e2136e' },
-    { id: 'nagad', label: 'Nagad', number: '', type: 'Personal', color: '#ec1c24' },
+    { id: 'bkash', label: 'bKash', color: '#e2136e', active: true, numbers: [] },
+    { id: 'nagad', label: 'Nagad', color: '#ec1c24', active: true, numbers: [] },
   ],
   whatsapp: '',
 };

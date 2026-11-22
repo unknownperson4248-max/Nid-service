@@ -14,6 +14,7 @@
     trash: '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13"/>', logout: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5M15 12H3"/>',
     refresh: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>', money: '<path d="M12 2v20M17 6a4 4 0 0 0-4-2H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6h-3a4 4 0 0 1-4-2"/>',
     menu: '<path d="M3 6h18M3 12h18M3 18h18"/>', back: '<path d="M15 6l-6 6 6 6"/>', eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>', lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+    up: '<path d="M18 15l-6-6-6 6"/>', down: '<path d="M6 9l6 6 6-6"/>',
   };
   const icon = (n, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
   let toastT; function toast(m) { let e = $('#toast'); if (!e) { e = document.createElement('div'); e.id = 'toast'; e.className = 'toast'; document.body.appendChild(e); } e.textContent = m; e.style.display = ''; clearTimeout(toastT); toastT = setTimeout(() => e.style.display = 'none', 2000); }
@@ -33,7 +34,7 @@
   }
   function renderNoAdmin() { root.innerHTML = `<div class="login"><div class="login-card" style="text-align:center"><div class="mark">${icon('lock')}</div><h2>Not an admin</h2><p>This account has no admin access.</p><a class="btn" href="/">Go to app</a></div></div>`; }
 
-  const NAV = [['dash', 'dash', 'Dashboard'], ['orders', 'box', 'Orders'], ['deposits', 'wallet', 'Deposits'], ['services', 'grid', 'Services'], ['users', 'users', 'Users'], ['notices', 'bell', 'Notices'], ['texts', 'edit', 'Texts'], ['layout', 'grid', 'Layout'], ['settings', 'cog', 'Settings']];
+  const NAV = [['dash', 'dash', 'Dashboard'], ['orders', 'box', 'Orders'], ['deposits', 'wallet', 'Deposits'], ['payments', 'money', 'Payment Methods'], ['services', 'grid', 'Services'], ['users', 'users', 'Users'], ['notices', 'bell', 'Notices'], ['texts', 'edit', 'Texts'], ['layout', 'grid', 'Layout'], ['settings', 'cog', 'Settings']];
   function renderShell() {
     root.innerHTML = `<div class="wrap">
       <aside class="side ${S.menuOpen ? 'on' : ''}"><div class="brand"><span class="mark">${icon('bolt')}</span><b>WizeFF Admin</b></div>
@@ -46,7 +47,7 @@
   }
   async function loadCounts() { const r = await api('/api/admin/overview'); if (r.ok) { S.stats = r.stats; const po = $('.orders-count'), pd = $('.deposits-count'); if (po && r.stats.pendingOrders) { po.textContent = r.stats.pendingOrders; po.style.display = ''; } if (pd && r.stats.pendingDeposits) { pd.textContent = r.stats.pendingDeposits; pd.style.display = ''; } } }
 
-  function go(tab) { S.tab = tab; document.querySelectorAll('.side nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab)); const titles = { dash: 'Dashboard', orders: 'Orders', deposits: 'Deposits', services: 'Services & Forms', users: 'Users', notices: 'Notices', texts: 'Website texts', layout: 'Layout (show / hide)', settings: 'Settings' }; $('#title').textContent = titles[tab]; S.menuOpen = false; syncMenu(); const views = { dash: vDash, orders: vOrders, deposits: vDeposits, services: vServices, users: vUsers, notices: vNotices, texts: vTexts, layout: vLayout, settings: vSettings }; (views[tab] || vDash)(); }
+  function go(tab) { S.tab = tab; document.querySelectorAll('.side nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab)); const titles = { dash: 'Dashboard', orders: 'Orders', deposits: 'Deposits', payments: 'Payment Methods', services: 'Services & Forms', users: 'Users', notices: 'Notices', texts: 'Website texts', layout: 'Layout (show / hide)', settings: 'Settings' }; $('#title').textContent = titles[tab]; S.menuOpen = false; syncMenu(); const views = { dash: vDash, orders: vOrders, deposits: vDeposits, payments: vPayments, services: vServices, users: vUsers, notices: vNotices, texts: vTexts, layout: vLayout, settings: vSettings }; (views[tab] || vDash)(); }
   function syncMenu() { const s = $('.side'), sc = $('.side-scrim'); if (s) s.classList.toggle('on', S.menuOpen); if (sc) sc.classList.toggle('on', S.menuOpen); }
 
   /* ---------- dashboard ---------- */
@@ -114,23 +115,59 @@
   }
 
   /* ---------- services (form builder) ---------- */
+  let catOpen = {}; // which category sections are expanded (default: all open)
   async function vServices() {
-    const c = $('#content');
+    const c = $('#content'); c.innerHTML = '<div class="spin"></div>';
     const r = await api('/api/admin/services'); S.services = r.services || []; S.cats = r.cats || [];
-    c.innerHTML = `<div class="flex" style="margin-bottom:14px"><button class="btn" data-act="new-svc">${icon('plus')}New service</button><button class="btn btn-ghost" data-act="edit-cats">Categories</button><span class="muted">${S.services.length} services</span></div>
-      <div class="row-wrap" id="svc-list">${S.services.map(svcItem).join('') || '<div class="empty">No services</div>'}</div>`;
+    renderServiceTree();
   }
-  function svcItem(s, i) {
-    return `<div class="item"><div class="flex" style="justify-content:space-between">
-      <div class="flex"><span class="iconbox" style="background:${s.color || '#0f766e'}">${icon(iconName(s.icon))}</span>
-        <div><b>${esc(tl(s.name))}</b> ${s.active ? '' : '<span class="pill">off</span>'} ${s.featured ? '<span class="pill">★ featured</span>' : ''}<div class="muted" style="font-size:12.5px">${esc(tl(s.sub))} • ${(s.fields || []).length} fields • ${catName(s.cat)}</div></div></div>
-      <div class="flex"><button class="btn btn-ghost btn-sm" data-edit-svc="${s.id}">${icon('edit')}Edit</button><button class="btn btn-bad btn-sm" data-del-svc="${s.id}">${icon('trash')}</button></div></div></div>`;
+  function renderServiceTree() {
+    const c = $('#content');
+    const cats = S.cats.slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    const uncat = S.services.filter((s) => !cats.some((x) => x.id === (s.cat || '')));
+    c.innerHTML = `<div class="flex" style="margin-bottom:14px;flex-wrap:wrap">
+        <button class="btn" data-act="new-svc">${icon('plus')}New product</button>
+        <button class="btn btn-ghost" data-act="edit-cats">${icon('tag')}Categories</button>
+        <span class="muted">${S.services.length} products in ${cats.length} categories</span>
+      </div>
+      <div id="svc-tree">
+        ${cats.map((cat) => catSection(cat)).join('')}
+        ${uncat.length ? catSection({ id: '__none', name: 'Uncategorized' }, uncat) : ''}
+      </div>`;
   }
+  function catSection(cat, overrideProducts) {
+    const products = (overrideProducts || S.services.filter((s) => (s.cat || '') === cat.id)).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    const open = catOpen[cat.id] !== false;
+    return `<div class="cat-sec${open ? ' open' : ''}">
+      <div class="cat-head" data-cat-toggle="${esc(cat.id)}">
+        <button type="button" class="ib cat-chev">${icon('down')}</button>
+        <b>${esc(tl(cat.name))}</b>
+        <span class="pill">${products.length}</span>
+        ${cat.id !== '__none' ? `<button type="button" class="btn btn-ghost btn-sm" data-add-prod="${esc(cat.id)}" style="margin-left:auto">${icon('plus')}Add product</button>` : ''}
+      </div>
+      <div class="cat-body" ${open ? '' : 'hidden'}>
+        ${products.map((s) => prodRow(s)).join('') || `<div class="empty" style="padding:18px">No products yet</div>`}
+      </div>
+    </div>`;
+  }
+  function prodRow(s) {
+    const priceLbl = (s.price || 0) > 0 ? money(s.price) : (s.fields || []).some((f) => f.type === 'select') ? 'from options' : 'free';
+    return `<div class="prod-row" data-prod="${s.id}">
+      <span class="prod-thumb">${s.image ? `<img src="${esc(s.image)}" alt="">` : `<span style="background:${s.color || '#0f766e'}">${icon(iconName(s.icon))}</span>`}</span>
+      <div class="prod-info"><b>${esc(tl(s.name))}</b><small>${esc(tl(s.sub))} • ${priceLbl}${s.featured ? ' • ★ featured' : ''}</small></div>
+      <label class="tgl" title="Active"><input type="checkbox" data-toggle-svc="${s.id}" ${s.active !== false ? 'checked' : ''}><i></i></label>
+      <button type="button" class="ib" data-move-svc="${s.id}:up" title="Move up">${icon('up')}</button>
+      <button type="button" class="ib" data-move-svc="${s.id}:down" title="Move down">${icon('down')}</button>
+      <button type="button" class="ib" data-edit-svc="${s.id}" title="Edit">${icon('edit')}</button>
+      <button type="button" class="ib" data-del-svc="${s.id}" title="Delete" style="color:var(--bad)">${icon('trash')}</button>
+    </div>`;
+  }
+  async function saveServiceList(list) { S.services = list; const r = await api('/api/admin/services', { services: list }); if (!r.ok) toast('Error'); return r.ok; }
   const iconName = (n) => (ICONS[n] ? n : 'bolt');
   const catName = (id) => { const c = S.cats.find((x) => x.id === id); return c ? tl(c.name) : id || '-'; };
 
   let editing = null; // service being edited (deep copy)
-  function newService() { editing = { id: 'svc' + Date.now().toString(36), cat: (S.cats[0] || {}).id || 'topup', icon: 'bolt', color: '#0f766e', active: true, featured: false, price: 0, name: '', sub: '', note: '', fields: [] }; svcModal(); }
+  function newService(presetCat) { editing = { id: 'svc' + Date.now().toString(36), cat: presetCat || (S.cats[0] || {}).id || '', icon: 'bolt', color: '#0f766e', active: true, featured: false, price: 0, name: '', sub: '', note: '', fields: [] }; svcModal(); }
   function editService(id) { const s = S.services.find((x) => x.id === id); editing = JSON.parse(JSON.stringify(s)); if (!editing.fields) editing.fields = []; svcModal(); }
   function svcModal() {
     const s = editing;
@@ -317,7 +354,6 @@
       <div class="field"><label>Currency</label><input id="s-cur" value="${esc(s.currency || '৳')}" maxlength="3"></div><div class="field"><label>Min deposit (৳)</label><input id="s-min" type="number" value="${s.minDeposit || 20}"></div>
       <div class="field"><label>Referral bonus (৳)</label><input id="s-ref" type="number" value="${s.referralBonus || 0}"></div><div class="field"><label>WhatsApp (support)</label><input id="s-wa" value="${esc(s.whatsapp || '')}" placeholder="8801XXXXXXXXX"></div></div>
     </div></div>
-    <div class="card" style="margin-top:16px"><div class="card-h">${icon('wallet')}Payment numbers<button class="btn btn-sm" data-act="add-method" style="margin-left:auto">${icon('plus')}Add</button></div><div class="card-b"><div id="methods">${(s.depositMethods || []).map(methodRow).join('')}</div></div></div>
     <div style="margin-top:16px"><button class="btn btn-ok" id="s-save">${icon('check')}Save settings</button></div>`;
     $('#s-save').addEventListener('click', saveSettings);
     $('#s-logobtn').addEventListener('click', () => $('#s-logofile').click());
@@ -331,11 +367,79 @@
     });
     document.querySelectorAll('[data-theme-pick]').forEach((b) => b.addEventListener('click', () => { $('#s-theme').value = b.dataset.themePick; }));
   }
-  const methodRow = (m) => `<div class="fieldrow" data-method><div class="grid2"><div class="field"><label>Label</label><input data-ml value="${esc(m.label || '')}"></div><div class="field"><label>Number</label><input data-mn value="${esc(m.number || '')}" placeholder="01XXXXXXXXX"></div><div class="field"><label>Type</label><input data-mt value="${esc(m.type || 'Personal')}"></div><div class="field"><label>Color</label><input data-mc type="color" value="${esc(m.color || '#0f766e')}" style="height:42px;padding:3px"></div></div><div style="text-align:right"><button class="btn btn-bad btn-sm" data-del-method>${icon('trash')}</button></div></div>`;
   async function saveSettings() {
-    const methods = [...document.querySelectorAll('[data-method]')].map((el) => ({ id: (el.querySelector('[data-ml]').value || 'm').toLowerCase().replace(/[^a-z0-9]/g, ''), label: el.querySelector('[data-ml]').value.trim(), number: el.querySelector('[data-mn]').value.trim(), type: el.querySelector('[data-mt]').value.trim(), color: el.querySelector('[data-mc]').value })).filter((m) => m.label);
-    const settings = { seoTitle: $('#s-seot').value.trim(), seoDesc: $('#s-seod').value.trim(), logo: S.logo || '', themeColor: $('#s-theme').value, brandA: $('#s-a').value.trim(), brandB: $('#s-b').value.trim(), tagline: $('#s-tbn').value.trim(), currency: $('#s-cur').value.trim() || '৳', minDeposit: Number($('#s-min').value) || 20, referralBonus: Number($('#s-ref').value) || 0, whatsapp: $('#s-wa').value.replace(/[^0-9]/g, ''), depositMethods: methods };
+    const settings = { seoTitle: $('#s-seot').value.trim(), seoDesc: $('#s-seod').value.trim(), logo: S.logo || '', themeColor: $('#s-theme').value, brandA: $('#s-a').value.trim(), brandB: $('#s-b').value.trim(), tagline: $('#s-tbn').value.trim(), currency: $('#s-cur').value.trim() || '৳', minDeposit: Number($('#s-min').value) || 20, referralBonus: Number($('#s-ref').value) || 0, whatsapp: $('#s-wa').value.replace(/[^0-9]/g, '') };
     const r = await api('/api/admin/settings', { settings }); if (r.ok) toast('Saved ✓'); else toast('Error');
+  }
+
+  /* ---------- payment methods (multiple receiving numbers per method, matched by amount) ---------- */
+  let pmMethods = [];
+  async function vPayments() {
+    const c = $('#content'); c.innerHTML = '<div class="spin"></div>';
+    const r = await api('/api/admin/settings'); pmMethods = JSON.parse(JSON.stringify((r.settings || {}).depositMethods || []));
+    renderPayments();
+  }
+  function renderPayments() {
+    const c = $('#content');
+    c.innerHTML = `<div class="flex" style="margin-bottom:14px"><button class="btn" data-act="add-pm">${icon('plus')}Add payment method</button><span class="muted">${pmMethods.length} methods</span></div>
+      <div id="pm-list">${pmMethods.map(pmCard).join('') || '<div class="empty">No payment methods yet</div>'}</div>
+      <div style="margin-top:16px"><button class="btn btn-ok" id="pm-save">${icon('check')}Save payment methods</button></div>`;
+    $('#pm-save').addEventListener('click', savePayments);
+  }
+  function pmCard(m, mi) {
+    const nums = m.numbers || [];
+    const activeCount = nums.filter((n) => n.active !== false && !n.hidden).length;
+    return `<div class="pm-card${m._open ? ' open' : ''}">
+      <div class="pm-head" data-pm-toggle="${mi}">
+        <span class="pm-dot" style="background:${esc(m.color || '#0f766e')}"></span>
+        <b>${esc(m.label || 'Unnamed')}</b>
+        <span class="pill">${nums.length} number${nums.length === 1 ? '' : 's'}</span>
+        ${m.active === false ? '<span class="pill" style="background:#fee2e2;color:#b91c1c">off</span>' : activeCount === 0 ? '<span class="pill" style="background:#fef3c7;color:#b45309">no active number</span>' : ''}
+        <span style="margin-left:auto"></span>
+        <button type="button" class="ib" data-del-pm="${mi}">${icon('trash')}</button>
+        <button type="button" class="ib pm-chev">${icon('back')}</button>
+      </div>
+      <div class="pm-body" ${m._open ? '' : 'hidden'}>
+        <div class="grid2">
+          <div class="field"><label>Method name</label><input data-pmf="${mi}:label" value="${esc(m.label || '')}" placeholder="e.g. Rocket, Binance Pay"></div>
+          <div class="field"><label>Color</label><input type="color" data-pmf="${mi}:color" value="${esc(m.color || '#0f766e')}" style="height:42px;padding:3px"></div>
+        </div>
+        <label class="flex" style="gap:6px;margin-bottom:12px"><input type="checkbox" data-pmf="${mi}:active" ${m.active !== false ? 'checked' : ''} style="width:auto"> Method is active (shown to customers)</label>
+        <div class="muted" style="font-size:12px;margin-bottom:8px">Each number can serve a different amount range. The customer gets whichever active number matches the amount they type.</div>
+        <div id="pm-nums-${mi}">${nums.map((n, ni) => pmNumRow(mi, ni, n)).join('')}</div>
+        <button type="button" class="btn btn-ghost btn-sm" data-add-pn="${mi}">${icon('plus')}Add number</button>
+      </div>
+    </div>`;
+  }
+  const pmNumRow = (mi, ni, n) => `<div class="pm-num">
+    <div class="grid2">
+      <div class="field"><label>Label (optional)</label><input data-pnf="${mi}:${ni}:label" value="${esc(n.label || '')}" placeholder="e.g. Personal 1"></div>
+      <div class="field"><label>Number</label><input data-pnf="${mi}:${ni}:number" value="${esc(n.number || '')}" placeholder="01XXXXXXXXX"></div>
+      <div class="field"><label>Type</label><select data-pnf="${mi}:${ni}:type">${['Personal', 'Agent', 'Merchant'].map((t) => `<option value="${t}" ${n.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+      <div></div>
+      <div class="field"><label>Min amount (৳)</label><input type="number" min="0" data-pnf="${mi}:${ni}:min" value="${n.min || 0}"></div>
+      <div class="field"><label>Max amount (৳, empty = no limit)</label><input type="number" min="0" data-pnf="${mi}:${ni}:max" value="${n.max != null ? n.max : ''}"></div>
+    </div>
+    <div class="flex">
+      <label class="flex" style="gap:6px"><input type="checkbox" data-pnf="${mi}:${ni}:active" ${n.active !== false ? 'checked' : ''} style="width:auto"> Active</label>
+      <label class="flex" style="gap:6px"><input type="checkbox" data-pnf="${mi}:${ni}:hidden" ${n.hidden ? 'checked' : ''} style="width:auto"> Hidden from customers</label>
+      <button type="button" class="btn btn-bad btn-sm" data-del-pn="${mi}:${ni}" style="margin-left:auto">${icon('trash')}</button>
+    </div>
+  </div>`;
+  function readPaymentsFromDom() {
+    document.querySelectorAll('[data-pmf]').forEach((el) => { const [mi, k] = el.dataset.pmf.split(':'); const m = pmMethods[+mi]; if (!m) return; m[k] = el.type === 'checkbox' ? el.checked : el.value; });
+    document.querySelectorAll('[data-pnf]').forEach((el) => {
+      const [mi, ni, k] = el.dataset.pnf.split(':'); const n = (pmMethods[+mi] || {}).numbers && pmMethods[+mi].numbers[+ni]; if (!n) return;
+      if (k === 'min') n.min = el.value === '' ? 0 : Number(el.value);
+      else if (k === 'max') n.max = el.value === '' ? null : Number(el.value);
+      else n[k] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+  }
+  async function savePayments() {
+    readPaymentsFromDom();
+    const depositMethods = pmMethods.map((m) => ({ label: m.label, color: m.color, active: m.active !== false, numbers: (m.numbers || []).map((n) => ({ label: n.label, number: n.number, type: n.type, min: n.min, max: n.max, active: n.active !== false, hidden: !!n.hidden })) }));
+    const r = await api('/api/admin/settings', { settings: { depositMethods } });
+    if (r.ok) { toast('Saved ✓'); vPayments(); } else toast('Error');
   }
 
   /* ---------- helpers ---------- */
@@ -358,9 +462,20 @@
     const dok = e.target.closest('[data-dep-ok]'); if (dok) { if (confirm('Approve this deposit and add balance?')) { const r = await api('/api/admin/deposit', { key: dok.dataset.depOk, status: 'approved' }); if (r.ok) { toast('Approved'); vDeposits(); loadCounts(); } } return; }
     const dno = e.target.closest('[data-dep-no]'); if (dno) { if (confirm('Reject this deposit?')) { const r = await api('/api/admin/deposit', { key: dno.dataset.depNo, status: 'rejected' }); if (r.ok) { toast('Rejected'); vDeposits(); loadCounts(); } } return; }
     if (e.target.closest('[data-act="new-svc"]')) { newService(); return; }
+    const addProd = e.target.closest('[data-add-prod]'); if (addProd) { newService(addProd.dataset.addProd === '__none' ? '' : addProd.dataset.addProd); return; }
+    const catTog = e.target.closest('[data-cat-toggle]'); if (catTog) { const id = catTog.dataset.catToggle; catOpen[id] = catOpen[id] === false; renderServiceTree(); return; }
+    const toggleSvc = e.target.closest('[data-toggle-svc]'); if (toggleSvc) { const s = S.services.find((x) => x.id === toggleSvc.dataset.toggleSvc); if (s) { s.active = toggleSvc.checked; await saveServiceList(S.services); } return; }
+    const moveSvc = e.target.closest('[data-move-svc]'); if (moveSvc) {
+      const [id, dir] = moveSvc.dataset.moveSvc.split(':'); const s = S.services.find((x) => x.id === id); if (!s) return;
+      const siblings = S.services.filter((x) => (x.cat || '') === (s.cat || '')).sort((a, b) => (a.order || 0) - (b.order || 0));
+      const idx = siblings.indexOf(s); const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= siblings.length) return;
+      siblings.forEach((x, i) => { x.order = i; }); const tmp = siblings[idx].order; siblings[idx].order = siblings[swapIdx].order; siblings[swapIdx].order = tmp;
+      await saveServiceList(S.services); renderServiceTree(); return;
+    }
     if (e.target.closest('[data-act="edit-cats"]')) { editCats(); return; }
     const es = e.target.closest('[data-edit-svc]'); if (es) { editService(es.dataset.editSvc); return; }
-    const ds = e.target.closest('[data-del-svc]'); if (ds) { if (confirm('Delete this service?')) { const list = S.services.filter((x) => x.id !== ds.dataset.delSvc); const r = await api('/api/admin/services', { services: list }); if (r.ok) { S.services = list; toast('Deleted'); vServices(); } } return; }
+    const ds = e.target.closest('[data-del-svc]'); if (ds) { if (confirm('Delete this product?')) { const list = S.services.filter((x) => x.id !== ds.dataset.delSvc); if (await saveServiceList(list)) { toast('Deleted'); renderServiceTree(); } } return; }
     if (e.target.closest('[data-act="add-field"]')) { readFieldsFromDom(); editing.fields.push({ key: '', type: 'text', required: false, label: '' }); $('#fields-wrap').innerHTML = editing.fields.map(fieldEditor).join(''); return; }
     const qa = e.target.closest('[data-qa]'); if (qa) { readFieldsFromDom();
       const presets = {
@@ -380,8 +495,11 @@
     const user = e.target.closest('[data-user]'); if (user) { try { userModal(JSON.parse(user.dataset.user)); } catch (x) {} return; }
     if (e.target.closest('[data-act="add-notice"]')) { saveNotices(); notices.unshift({ id: 'n' + Date.now(), type: 'info', ts: Date.now(), title: '', body: '' }); const nl = $('#nlist'); if (nl) nl.innerHTML = renderNotices(); saveNoticesToServer(); return; }
     const delN = e.target.closest('[data-del-notice]'); if (delN) { saveNotices(); notices.splice(+delN.dataset.delNotice, 1); $('#nlist').innerHTML = renderNotices(); saveNoticesToServer(); return; }
-    if (e.target.closest('[data-act="add-method"]')) { const m = $('#methods'); const div = document.createElement('div'); div.innerHTML = methodRow({ label: '', number: '', type: 'Personal', color: '#0f766e' }); m.appendChild(div.firstChild); return; }
-    const delM = e.target.closest('[data-del-method]'); if (delM) { delM.closest('[data-method]').remove(); return; }
+    const delPm = e.target.closest('[data-del-pm]'); if (delPm) { readPaymentsFromDom(); if (confirm('Delete this payment method?')) { pmMethods.splice(+delPm.dataset.delPm, 1); renderPayments(); } return; }
+    const addPn = e.target.closest('[data-add-pn]'); if (addPn) { readPaymentsFromDom(); const m = pmMethods[+addPn.dataset.addPn]; m.numbers = m.numbers || []; m.numbers.push({ label: '', number: '', type: 'Personal', min: 0, max: null, active: true, hidden: false }); m._open = true; renderPayments(); return; }
+    const delPn = e.target.closest('[data-del-pn]'); if (delPn) { readPaymentsFromDom(); const [mi, ni] = delPn.dataset.delPn.split(':'); pmMethods[+mi].numbers.splice(+ni, 1); pmMethods[+mi]._open = true; renderPayments(); return; }
+    if (e.target.closest('[data-act="add-pm"]')) { readPaymentsFromDom(); pmMethods.push({ label: '', color: '#0f766e', active: true, numbers: [], _open: true }); renderPayments(); return; }
+    const pmTog = e.target.closest('[data-pm-toggle]'); if (pmTog) { readPaymentsFromDom(); const m = pmMethods[+pmTog.dataset.pmToggle]; m._open = !m._open; renderPayments(); return; }
   });
   // notices auto-save on blur
   document.addEventListener('blur', (e) => { if (e.target.closest && e.target.closest('[data-nf]')) saveNoticesToServer(); }, true);
