@@ -155,6 +155,8 @@ function computeOrder(svc, fields) {
     } else {
       clean[f.key] = clip(v, 500);
     }
+    // a fixed price set on the box: deducted from balance when the box is filled
+    if (typeof f.price === 'number' && f.price > 0) amount += f.price;
   }
   return { amount: Math.round(amount), clean };
 }

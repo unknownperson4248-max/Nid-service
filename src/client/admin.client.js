@@ -180,6 +180,7 @@
         <div class="field"><label>Key (english, no space)</label><input data-ff="${i}:key" value="${esc(f.key || '')}" placeholder="auto"></div>
         <div class="field"><label>Type</label><select data-ff="${i}:type">${[['text', 'Single line text'], ['number', 'Number'], ['phone', 'Phone number'], ['select', 'Dropdown / package (choose one)'], ['textarea', 'Multi-line note'], ['date', 'Date'], ['image', 'Image upload (buyer attaches a picture)']].map(([tp, lbl]) => `<option value="${tp}" ${f.type === tp ? 'selected' : ''}>${lbl}</option>`).join('')}</select></div>
         <div class="field"><label>Placeholder</label><input data-ff="${i}:ph" value="${esc(f.ph || '')}"></div>
+        <div class="field"><label>Price (৳) — cut from balance</label><input type="number" min="0" data-ff="${i}:price" value="${f.price != null ? f.price : ''}" placeholder="0 = free"></div>
         <div class="field"><label class="flex" style="gap:6px;margin-top:24px"><input type="checkbox" data-ff="${i}:required" ${f.required ? 'checked' : ''} style="width:auto"> Required</label></div>
       </div>
       ${f.type === 'number' ? `<div class="grid2"><div class="field"><label>Min</label><input type="number" data-ff="${i}:min" value="${f.min != null ? f.min : ''}"></div><div class="field"><label>Max</label><input type="number" data-ff="${i}:max" value="${f.max != null ? f.max : ''}"></div><div class="field"><label class="flex" style="gap:6px"><input type="checkbox" data-ff="${i}:priceFromValue" ${f.priceFromValue ? 'checked' : ''} style="width:auto"> Value = price</label></div></div>` : ''}
@@ -194,6 +195,7 @@
       const [i, pathRaw] = el.dataset.ff.split(':'); const path = pathRaw; const f = editing.fields[+i]; if (!f) return;
       let val = el.type === 'checkbox' ? el.checked : el.value;
       if (path === 'min' || path === 'max') val = el.value === '' ? null : Number(el.value);
+      if (path === 'price') val = el.value === '' || Number(el.value) <= 0 ? undefined : Number(el.value);
       f[path] = val;
     });
     document.querySelectorAll('[data-fo]').forEach((el) => {

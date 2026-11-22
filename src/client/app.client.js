@@ -288,6 +288,7 @@
       const val = vals[f.key];
       if (f.type === 'select' && val) { const o = (f.options || []).find((x) => x.label === val); if (o && typeof o.price === 'number') a += o.price; }
       if (f.type === 'number' && f.priceFromValue && val) { const n = +val; if (Number.isFinite(n)) a += n; }
+      if (typeof f.price === 'number' && f.price > 0 && val) a += f.price;
     });
     return Math.round(a);
   }
