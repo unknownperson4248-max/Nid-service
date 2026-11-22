@@ -198,6 +198,7 @@
   const qsCard = (s) => `<button class="qs" data-nav="service/${esc(s.id)}"><span class="arrow">${icon('right')}</span>
     ${svcIcon(s, 'qs-ic')}
     <b>${esc(t(s.name))}</b><small>${esc(t(s.sub))}</small><span class="from">${u('from')} ${money(svcMinPrice(s))}</span></button>`;
+  const svcHasVariable = (s) => (s.fields || []).some((f) => (f.type === 'select' && (f.options || []).some((o) => typeof o.price === 'number')) || (f.type === 'number' && f.priceFromValue));
   function svcMinPrice(s) {
     let base = +s.price || 0; const prices = [];
     (s.fields || []).forEach((f) => { if (f.type === 'select') (f.options || []).forEach((o) => { if (typeof o.price === 'number') prices.push(o.price); }); if (f.type === 'number' && f.priceFromValue && f.min) prices.push(f.min); });
@@ -231,7 +232,8 @@
       <div class="ph"><button class="back" data-back>${icon('left')}</button><div><h2>${esc(t(s.name))}</h2><div class="sub">${esc(t(s.sub))}</div></div></div>
       ${s.image ? `<div class="svc-banner"><img src="${esc(s.image)}" alt="${esc(t(s.name))}"></div>` : ''}
       <div class="svc-hero" style="background:linear-gradient(135deg,${svcColor(s)},${svcColor(s)}cc)">
-        <span class="qs-ic">${icon(s.icon || 'bolt')}</span><span><b>${esc(t(s.name))}</b><br><small>${esc(t(s.sub))}</small></span></div>
+        <span class="qs-ic">${icon(s.icon || 'bolt')}</span><span class="svc-hero-t"><b>${esc(t(s.name))}</b><br><small>${esc(t(s.sub))}</small></span>
+        <span class="svc-price">${svcHasVariable(s) ? `<small>${u('from')}</small>` : ''}${money(svcMinPrice(s))}</span></div>
       ${t(s.note) ? `<div class="notice"><div class="notice-h">${icon('info')}<span>${u('details')}</span></div><div class="notice-b">${esc(t(s.note))}</div></div>` : ''}
       <div id="ord-err"></div>
       <form id="svc-form" class="card card-pad">
