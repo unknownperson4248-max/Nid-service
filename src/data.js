@@ -8,6 +8,9 @@ export const DEFAULT_SETTINGS = {
   seoDesc: 'Fast, safe and reliable game top-up, social media and mobile recharge service.',
   logo: '', // '/img/<id>' uploaded from admin
   themeColor: '#0f766e',
+  heroTitle: 'Top up in seconds',
+  heroSub: 'Free Fire diamond, SMM & recharge. Fast, safe and reliable.',
+  heroImg: '', // optional 3D illustration uploaded from admin
   tagline: { bn: 'দ্রুত • নিরাপদ • বিশ্বস্ত', en: 'Fast • Safe • Reliable' },
   currency: '৳',
   referralBonus: 10, // credited to referrer when a referred user's first deposit is approved

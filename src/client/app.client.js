@@ -141,7 +141,7 @@
     </div></nav>`;
   }
   function drawer() {
-    const drItem = (r, ic, lbl, on, color, img) => `<button class="dr-item ${on ? 'on' : ''}" data-nav="${r}"><span class="dr-ic ${img ? 'img' : ''}" ${!img && color ? `style="background:${color}"` : ''}>${img ? `<img src="${esc(img)}" alt="">` : icon(ic)}</span><span class="dr-l">${esc(lbl)}</span><span class="dr-ch">${icon('right')}</span></button>`;
+    const drItem = (r, ic, lbl, on, color, img) => `<button class="dr-item ${on ? 'on' : ''}" data-nav="${r}"><span class="dr-ic ${img ? 'img' : ''}" ${!img && color ? `style="background:${color}!important"` : ''}>${img ? `<img src="${esc(img)}" alt="">` : icon(ic)}</span><span class="dr-l">${esc(lbl)}</span><span class="dr-ch">${icon('right')}</span></button>`;
     const nav = [['home', 'home', u('dashboard')]];
     // services grouped: category header -> its products
     const active = S.services.filter((s) => s.active);
@@ -154,9 +154,18 @@
       <div class="dr-head"><div class="dr-top"><button class="dr-back" data-act="drawer-close" aria-label="back">${icon('left')}</button>
         <div class="logo">${S.settings.logo ? `<img class="logo-img" src="${esc(S.settings.logo)}" alt="">` : ''}<span class="logo-t">${esc(S.settings.brandA)} <em>${esc(S.settings.brandB)}</em></span></div></div></div>
       <div class="dr-body">
+        <div class="dr-prof" data-nav="profile">
+          <span class="dr-av">${initials(S.user.name)}</span>
+          <div class="dr-prof-t"><b>${esc(S.user.name)}</b><small>${esc(S.user.phone || '')}</small></div>
+          <span class="dr-ch">${icon('right')}</span>
+        </div>
+        <div class="dr-wallet">
+          <div class="dr-wl"><span>${u('walletBalance')}</span><b>${money(S.user.balance)}</b></div>
+          <button class="dr-wbtn" data-nav="deposit">${icon('plus')}<span>${u('addMoney')}</span></button>
+        </div>
         ${nav.map(([r, ic, lbl]) => drItem(r, ic, lbl, S.route === r)).join('')}
         ${svcHtml}
-        <button class="dr-item" data-act="logout" style="color:var(--bad);margin-top:10px"><span class="dr-ic" style="background:var(--bad)">${icon('logout')}</span><span class="dr-l">${u('logout')}</span></button>
+        <button class="dr-item dr-logout" data-act="logout"><span class="dr-ic" style="background:#2a2f3a!important">${icon('logout')}</span><span class="dr-l">${u('logout')}</span></button>
       </div></aside>`;
   }
 
@@ -181,7 +190,14 @@
     let catSections = cats.map((c) => { const items = active.filter((s) => (s.cat || '') === c.id); if (!items.length) return ''; return `<div class="sec-h">${icon('grid')}${esc(t(c.name))}</div><div class="qgrid">${items.map(qsCard).join('')}</div>`; }).join('');
     const uncat = active.filter((s) => !cats.some((c) => c.id === (s.cat || ''))); if (uncat.length) catSections += `<div class="sec-h">${icon('grid')}${u('services')}</div><div class="qgrid">${uncat.map(qsCard).join('')}</div>`;
     if (!active.length) catSections = `<div class="sec-h">${icon('bolt')}${u('quickServices')}</div><div class="qgrid">${emptyBox(u('services'))}</div>`;
+    const B = S.settings || {};
+    const hero = L('home', 'hero') && (B.heroTitle || B.heroSub || B.heroImg) ? `<div class="hero-banner">
+        <div class="hb-txt"><span class="hb-hi">${esc(S.user.name.split(' ')[0])} 👋</span><h2>${esc(B.heroTitle || '')}</h2><p>${esc(B.heroSub || '')}</p>
+          <button class="hb-btn" data-nav="deposit">${icon('plus')}${u('addMoney')}</button></div>
+        <div class="hb-art">${B.heroImg ? `<img src="${esc(B.heroImg)}" alt="">` : `<span class="hb-orb">${icon('diamond')}</span>`}</div>
+      </div>` : '';
     v.innerHTML = `
+      ${hero}
       ${L('home', 'notices') && S.notices.length ? `<div class="sec-h">${icon('bell')}${u('noticeBoard')}</div>
       <div>${S.notices.map((n) => `<div class="notice ${n.type === 'urgent' ? 'urgent' : ''}">
         <div class="notice-h">${icon(n.type === 'urgent' ? 'alert' : 'info')}<span>${esc(t(n.title))}</span></div>
@@ -195,8 +211,8 @@
       <div style="height:10px"></div>`;
   }
   const svcIcon = (s, cls) => s.image ? `<span class="${cls} img"><img src="${esc(s.image)}" alt="" loading="lazy"></span>` : `<span class="${cls}" style="background:linear-gradient(135deg,${svcColor(s)},${svcColor(s)}cc)">${icon(s.icon || 'bolt')}</span>`;
-  const qsCard = (s) => `<button class="qs" data-nav="service/${esc(s.id)}"><span class="arrow">${icon('right')}</span>
-    ${svcIcon(s, 'qs-ic')}
+  const qsCard = (s) => `<button class="qs" data-nav="service/${esc(s.id)}">
+    <span class="qs-art" style="--c:${svcColor(s)}">${s.image ? `<img src="${esc(s.image)}" alt="" loading="lazy">` : `<span class="qs-ic">${icon(s.icon || 'bolt')}</span>`}</span>
     <b>${esc(t(s.name))}</b><small>${esc(t(s.sub))}</small><span class="from">${u('from')} ${money(svcMinPrice(s))}</span></button>`;
   const svcHasVariable = (s) => (s.fields || []).some((f) => (f.type === 'select' && (f.options || []).some((o) => typeof o.price === 'number')) || (f.type === 'number' && f.priceFromValue));
   function svcMinPrice(s) {

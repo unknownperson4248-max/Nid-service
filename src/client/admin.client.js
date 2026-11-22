@@ -14,7 +14,7 @@
     trash: '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13"/>', logout: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5M15 12H3"/>',
     refresh: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>', money: '<path d="M12 2v20M17 6a4 4 0 0 0-4-2H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6h-3a4 4 0 0 1-4-2"/>',
     menu: '<path d="M3 6h18M3 12h18M3 18h18"/>', back: '<path d="M15 6l-6 6 6 6"/>', eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>', lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
-    up: '<path d="M18 15l-6-6-6 6"/>', down: '<path d="M6 9l6 6 6-6"/>',
+    up: '<path d="M18 15l-6-6-6 6"/>', down: '<path d="M6 9l6 6 6-6"/>', home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
   };
   const icon = (n, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
   let toastT; function toast(m) { let e = $('#toast'); if (!e) { e = document.createElement('div'); e.id = 'toast'; e.className = 'toast'; document.body.appendChild(e); } e.textContent = m; e.style.display = ''; clearTimeout(toastT); toastT = setTimeout(() => e.style.display = 'none', 2000); }
@@ -319,7 +319,7 @@
     const c = $('#content'); c.innerHTML = '<div class="spin"></div>';
     const r = await api('/api/admin/settings'); const l = (r.settings && r.settings.layout) || {};
     const groups = [
-      ['home', 'Dashboard sections', [['notices', 'Notice board'], ['products', 'Products (category boxes)'], ['recent', 'Recent orders (LIVE)']]],
+      ['home', 'Dashboard sections', [['hero', 'Home banner (hero)'], ['notices', 'Notice board'], ['products', 'Products (category boxes)'], ['recent', 'Recent orders (LIVE)']]],
       ['menu', '3-dot menu items', [['orders', 'Order history'], ['referrals', 'Referrals'], ['profile', 'Profile']]],
       ['nav', 'Bottom navigation bar', [['orders', 'Orders'], ['addMoney', '+ Add money (center)'], ['referrals', 'Referrals'], ['profile', 'Profile']]],
     ];
@@ -336,7 +336,7 @@
   async function vSettings() {
     const c = $('#content'); c.innerHTML = '<div class="spin"></div>';
     const r = await api('/api/admin/settings'); const s = r.settings || {};
-    S.logo = s.logo || '';
+    S.logo = s.logo || ''; S.heroImg = s.heroImg || '';
     c.innerHTML = `<div class="card"><div class="card-h">${icon('eye')}Website, SEO & Theme</div><div class="card-b">
       <div class="field"><label>Website title (browser tab & Google)</label><input id="s-seot" maxlength="90" value="${esc(s.seoTitle || '')}" placeholder="e.g. WizeFF TopUp – Free Fire Diamond Top Up BD"></div>
       <div class="field"><label>Description (Google & share preview)</label><textarea id="s-seod" maxlength="300" placeholder="Short line about your service">${esc(s.seoDesc || '')}</textarea><div class="muted" style="font-size:11px">Shows under your site name on Google and when the link is shared.</div></div>
@@ -347,6 +347,13 @@
         <div class="field"><label>Theme color</label><div class="flex"><input id="s-theme" type="color" value="${esc(s.themeColor || '#0f766e')}" style="width:70px;height:46px;padding:3px"><span class="muted" style="font-size:12px">Whole site follows this color.</span></div>
           <div class="flex" style="margin-top:8px">${['#0f766e', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#0e1726', '#16a34a', '#dc2626'].map((h) => `<button type="button" data-theme-pick="${h}" style="width:28px;height:28px;border-radius:8px;border:2px solid #fff;box-shadow:0 0 0 1px #cbd5e1;background:${h}"></button>`).join('')}</div></div>
       </div>
+    </div></div>
+    <div class="card" style="margin-top:16px"><div class="card-h">${icon('home')}Home banner (hero)</div><div class="card-b">
+      <div class="field"><label>Title</label><input id="s-ht" maxlength="80" value="${esc(s.heroTitle || '')}" placeholder="e.g. Top up in seconds"></div>
+      <div class="field"><label>Short line</label><input id="s-hs" maxlength="160" value="${esc(s.heroSub || '')}" placeholder="e.g. Free Fire diamond, SMM & recharge"></div>
+      <div class="field"><label>3D illustration (optional, PNG with transparent background looks best)</label><div class="flex"><div id="s-hiprev" class="iconbox" style="width:64px;height:64px;background:#eef2f5;overflow:hidden">${s.heroImg ? `<img src="${esc(s.heroImg)}" style="width:100%;height:100%;object-fit:contain">` : icon('eye')}</div>
+        <button type="button" class="btn btn-ghost btn-sm" id="s-hibtn">${icon('plus')}Upload image</button><button type="button" class="btn btn-bad btn-sm" id="s-hidel" ${s.heroImg ? '' : 'style="display:none"'}>Remove</button></div>
+        <input type="file" id="s-hifile" accept="image/*" style="display:none"></div>
     </div></div>
     <div class="card" style="margin-top:16px"><div class="card-h">${icon('cog')}General</div><div class="card-b">
       <div class="grid2"><div class="field"><label>Brand name A</label><input id="s-a" value="${esc(s.brandA || '')}"></div><div class="field"><label>Brand name B (colored)</label><input id="s-b" value="${esc(s.brandB || '')}"></div>
@@ -366,9 +373,18 @@
       if (up.ok) { S.logo = up.path; $('#s-logoprev').innerHTML = `<img src="${esc(up.path)}" style="width:100%;height:100%;object-fit:cover">`; $('#s-logodel').style.display = ''; toast('Logo ready — press Save'); } else toast('Upload failed');
     });
     document.querySelectorAll('[data-theme-pick]').forEach((b) => b.addEventListener('click', () => { $('#s-theme').value = b.dataset.themePick; }));
+    $('#s-hibtn').addEventListener('click', () => $('#s-hifile').click());
+    $('#s-hidel').addEventListener('click', () => { S.heroImg = ''; $('#s-hiprev').innerHTML = icon('eye'); $('#s-hidel').style.display = 'none'; });
+    $('#s-hifile').addEventListener('change', async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      if (file.size > 2 * 1024 * 1024) { toast('Image too big (max 2MB)'); return; }
+      const dataUrl = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
+      toast('Uploading...'); const up = await api('/api/admin/upload', { dataUrl });
+      if (up.ok) { S.heroImg = up.path; $('#s-hiprev').innerHTML = `<img src="${esc(up.path)}" style="width:100%;height:100%;object-fit:contain">`; $('#s-hidel').style.display = ''; toast('Image ready — press Save'); } else toast('Upload failed');
+    });
   }
   async function saveSettings() {
-    const settings = { seoTitle: $('#s-seot').value.trim(), seoDesc: $('#s-seod').value.trim(), logo: S.logo || '', themeColor: $('#s-theme').value, brandA: $('#s-a').value.trim(), brandB: $('#s-b').value.trim(), tagline: $('#s-tbn').value.trim(), currency: $('#s-cur').value.trim() || '৳', minDeposit: Number($('#s-min').value) || 20, referralBonus: Number($('#s-ref').value) || 0, whatsapp: $('#s-wa').value.replace(/[^0-9]/g, '') };
+    const settings = { heroTitle: $('#s-ht').value.trim(), heroSub: $('#s-hs').value.trim(), heroImg: S.heroImg || '', seoTitle: $('#s-seot').value.trim(), seoDesc: $('#s-seod').value.trim(), logo: S.logo || '', themeColor: $('#s-theme').value, brandA: $('#s-a').value.trim(), brandB: $('#s-b').value.trim(), tagline: $('#s-tbn').value.trim(), currency: $('#s-cur').value.trim() || '৳', minDeposit: Number($('#s-min').value) || 20, referralBonus: Number($('#s-ref').value) || 0, whatsapp: $('#s-wa').value.replace(/[^0-9]/g, '') };
     const r = await api('/api/admin/settings', { settings }); if (r.ok) toast('Saved ✓'); else toast('Error');
   }
 
