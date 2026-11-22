@@ -276,7 +276,8 @@ function pubMethods(list) {
   return (list || []).filter((m) => m.active !== false).map((m) => ({ id: m.id, label: m.label, color: m.color,
     numbers: (m.numbers || []).filter((n) => n.active !== false && !n.hidden).map((n) => ({ id: n.id, label: n.label, number: n.number, type: n.type, min: n.min, max: n.max })) }));
 }
-const pubSettings = (s) => ({ heroTitle: s.heroTitle, heroSub: s.heroSub, heroImg: safeImg(s.heroImg), texts: cleanTexts(s.texts), layout: cleanLayout(s.layout), brandA: s.brandA, brandB: s.brandB, logo: safeImg(s.logo), themeColor: safeHex(s.themeColor), tagline: s.tagline, currency: s.currency, minDeposit: s.minDeposit,
+const pubBanners = (list) => (Array.isArray(list) ? list : []).map((b) => ({ img: safeImg(b && b.img), link: clip((b && b.link) || '', 120) })).filter((b) => b.img).slice(0, 8);
+const pubSettings = (s) => ({ heroTitle: s.heroTitle, heroSub: s.heroSub, heroImg: safeImg(s.heroImg), banners: pubBanners(s.banners), texts: cleanTexts(s.texts), layout: cleanLayout(s.layout), brandA: s.brandA, brandB: s.brandB, logo: safeImg(s.logo), themeColor: safeHex(s.themeColor), tagline: s.tagline, currency: s.currency, minDeposit: s.minDeposit,
   depositMethods: pubMethods(s.depositMethods), referralBonus: s.referralBonus, whatsapp: s.whatsapp });
 async function bumpStat(env, k) { const key = 'stat:' + k; const n = +((await env.DATA.get(key)) || 0); await env.DATA.put(key, String(n + 1)); }
 
@@ -431,6 +432,7 @@ async function handleAdmin(req, env, url, path, u) {
       next.texts = cleanTexts(next.texts); next.layout = cleanLayout(next.layout);
       next.seoTitle = clip(next.seoTitle, 90); next.seoDesc = clip(next.seoDesc, 300);
       next.heroTitle = clip(next.heroTitle, 80); next.heroSub = clip(next.heroSub, 160); next.heroImg = safeImg(next.heroImg);
+      if (Array.isArray(next.banners)) next.banners = next.banners.slice(0, 8).map((b) => ({ img: safeImg(b && b.img), link: clip((b && b.link) || '', 120) })).filter((b) => b.img);
       const hexish = (v, fallback) => (/^#[0-9a-f]{3,8}$/i.test(String(v || '')) ? String(v) : fallback);
       if (Array.isArray(next.depositMethods)) next.depositMethods = next.depositMethods.slice(0, 12).map((m) => ({
         id: clip(m.id, 20) || rid(8), label: clip(m.label, 30), color: hexish(m.color, '#0f766e'), active: m.active !== false,

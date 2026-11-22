@@ -191,13 +191,13 @@
     const uncat = active.filter((s) => !cats.some((c) => c.id === (s.cat || ''))); if (uncat.length) catSections += `<div class="sec-h">${icon('grid')}${u('services')}</div><div class="qgrid">${uncat.map(qsCard).join('')}</div>`;
     if (!active.length) catSections = `<div class="sec-h">${icon('bolt')}${u('quickServices')}</div><div class="qgrid">${emptyBox(u('services'))}</div>`;
     const B = S.settings || {};
-    const hero = L('home', 'hero') && (B.heroTitle || B.heroSub || B.heroImg) ? `<div class="hero-banner">
-        <div class="hb-txt"><span class="hb-hi">${esc(S.user.name.split(' ')[0])} 👋</span><h2>${esc(B.heroTitle || '')}</h2><p>${esc(B.heroSub || '')}</p>
-          <button class="hb-btn" data-nav="deposit">${icon('plus')}${u('addMoney')}</button></div>
-        <div class="hb-art">${B.heroImg ? `<img src="${esc(B.heroImg)}" alt="">` : `<span class="hb-orb">${icon('diamond')}</span>`}</div>
+    const banners = (B.banners || []).filter((b) => b && b.img);
+    const bannerHtml = L('home', 'hero') && banners.length ? `<div class="promo">
+        <div class="promo-track">${banners.map((b) => `<div class="promo-slide"${b.link ? ` data-nav="${esc(b.link)}" role="button"` : ''}><img src="${esc(b.img)}" alt="" loading="eager"></div>`).join('')}</div>
+        ${banners.length > 1 ? `<div class="promo-dots">${banners.map((_, i) => `<i${i === 0 ? ' class="on"' : ''}></i>`).join('')}</div>` : ''}
       </div>` : '';
     v.innerHTML = `
-      ${hero}
+      ${bannerHtml}
       ${L('home', 'notices') && S.notices.length ? `<div class="sec-h">${icon('bell')}${u('noticeBoard')}</div>
       <div>${S.notices.map((n) => `<div class="notice ${n.type === 'urgent' ? 'urgent' : ''}">
         <div class="notice-h">${icon(n.type === 'urgent' ? 'alert' : 'info')}<span>${esc(t(n.title))}</span></div>
@@ -209,11 +209,29 @@
       <div class="card">${S.live.length ? S.live.map(liveRow).join('') : emptyBox(u('noOrders'))}</div>` : ''}
 
       <div style="height:10px"></div>`;
+    if (banners.length > 1) initPromo(v);
+  }
+
+  let promoTimer = null;
+  function initPromo(root) {
+    const track = root.querySelector('.promo-track'); if (!track) return;
+    const dots = [...root.querySelectorAll('.promo-dots i')];
+    const n = track.children.length;
+    const sync = () => { const i = Math.round(track.scrollLeft / track.clientWidth); dots.forEach((d, j) => d.classList.toggle('on', j === i)); };
+    track.addEventListener('scroll', () => window.requestAnimationFrame(sync), { passive: true });
+    dots.forEach((d, j) => d.addEventListener('click', () => track.scrollTo({ left: j * track.clientWidth, behavior: 'smooth' })));
+    if (promoTimer) clearInterval(promoTimer);
+    promoTimer = setInterval(() => {
+      if (document.hidden || !document.body.contains(track)) { clearInterval(promoTimer); promoTimer = null; return; }
+      const i = Math.round(track.scrollLeft / track.clientWidth);
+      track.scrollTo({ left: ((i + 1) % n) * track.clientWidth, behavior: 'smooth' });
+    }, 4500);
   }
   const svcIcon = (s, cls) => s.image ? `<span class="${cls} img"><img src="${esc(s.image)}" alt="" loading="lazy"></span>` : `<span class="${cls}" style="background:linear-gradient(135deg,${svcColor(s)},${svcColor(s)}cc)">${icon(s.icon || 'bolt')}</span>`;
-  const qsCard = (s) => `<button class="qs" data-nav="service/${esc(s.id)}">
-    <span class="qs-art" style="--c:${svcColor(s)}">${s.image ? `<img src="${esc(s.image)}" alt="" loading="lazy">` : `<span class="qs-ic">${icon(s.icon || 'bolt')}</span>`}</span>
-    <b>${esc(t(s.name))}</b><small>${esc(t(s.sub))}</small><span class="from">${u('from')} ${money(svcMinPrice(s))}</span></button>`;
+  const qsCard = (s) => `<button class="qs" data-nav="service/${esc(s.id)}" style="--c:${svcColor(s)}">
+    ${s.featured ? `<span class="qs-badge">HOT</span>` : ''}
+    <span class="qs-art">${s.image ? `<img src="${esc(s.image)}" alt="" loading="lazy">` : `<span class="qs-ic">${icon(s.icon || 'bolt')}</span>`}</span>
+    <span class="qs-lbl"><b>${esc(t(s.name))}</b><span class="from">${u('from')} ${money(svcMinPrice(s))}</span></span></button>`;
   const svcHasVariable = (s) => (s.fields || []).some((f) => (f.type === 'select' && (f.options || []).some((o) => typeof o.price === 'number')) || (f.type === 'number' && f.priceFromValue));
   function svcMinPrice(s) {
     let base = +s.price || 0; const prices = [];

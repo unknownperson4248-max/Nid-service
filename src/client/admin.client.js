@@ -319,7 +319,7 @@
     const c = $('#content'); c.innerHTML = '<div class="spin"></div>';
     const r = await api('/api/admin/settings'); const l = (r.settings && r.settings.layout) || {};
     const groups = [
-      ['home', 'Dashboard sections', [['hero', 'Home banner (hero)'], ['notices', 'Notice board'], ['products', 'Products (category boxes)'], ['recent', 'Recent orders (LIVE)']]],
+      ['home', 'Dashboard sections', [['hero', 'Promo banner slider'], ['notices', 'Notice board'], ['products', 'Products (category boxes)'], ['recent', 'Recent orders (LIVE)']]],
       ['menu', '3-dot menu items', [['orders', 'Order history'], ['referrals', 'Referrals'], ['profile', 'Profile']]],
       ['nav', 'Bottom navigation bar', [['orders', 'Orders'], ['addMoney', '+ Add money (center)'], ['referrals', 'Referrals'], ['profile', 'Profile']]],
     ];
@@ -337,6 +337,7 @@
     const c = $('#content'); c.innerHTML = '<div class="spin"></div>';
     const r = await api('/api/admin/settings'); const s = r.settings || {};
     S.logo = s.logo || ''; S.heroImg = s.heroImg || '';
+    S.banners = (Array.isArray(s.banners) ? s.banners : []).map((b) => ({ img: (b && b.img) || '', link: (b && b.link) || '' })).filter((b) => b.img);
     c.innerHTML = `<div class="card"><div class="card-h">${icon('eye')}Website, SEO & Theme</div><div class="card-b">
       <div class="field"><label>Website title (browser tab & Google)</label><input id="s-seot" maxlength="90" value="${esc(s.seoTitle || '')}" placeholder="e.g. WizeFF TopUp – Free Fire Diamond Top Up BD"></div>
       <div class="field"><label>Description (Google & share preview)</label><textarea id="s-seod" maxlength="300" placeholder="Short line about your service">${esc(s.seoDesc || '')}</textarea><div class="muted" style="font-size:11px">Shows under your site name on Google and when the link is shared.</div></div>
@@ -348,12 +349,11 @@
           <div class="flex" style="margin-top:8px">${['#0f766e', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#0e1726', '#16a34a', '#dc2626'].map((h) => `<button type="button" data-theme-pick="${h}" style="width:28px;height:28px;border-radius:8px;border:2px solid #fff;box-shadow:0 0 0 1px #cbd5e1;background:${h}"></button>`).join('')}</div></div>
       </div>
     </div></div>
-    <div class="card" style="margin-top:16px"><div class="card-h">${icon('home')}Home banner (hero)</div><div class="card-b">
-      <div class="field"><label>Title</label><input id="s-ht" maxlength="80" value="${esc(s.heroTitle || '')}" placeholder="e.g. Top up in seconds"></div>
-      <div class="field"><label>Short line</label><input id="s-hs" maxlength="160" value="${esc(s.heroSub || '')}" placeholder="e.g. Free Fire diamond, SMM & recharge"></div>
-      <div class="field"><label>3D illustration (optional, PNG with transparent background looks best)</label><div class="flex"><div id="s-hiprev" class="iconbox" style="width:64px;height:64px;background:#eef2f5;overflow:hidden">${s.heroImg ? `<img src="${esc(s.heroImg)}" style="width:100%;height:100%;object-fit:contain">` : icon('eye')}</div>
-        <button type="button" class="btn btn-ghost btn-sm" id="s-hibtn">${icon('plus')}Upload image</button><button type="button" class="btn btn-bad btn-sm" id="s-hidel" ${s.heroImg ? '' : 'style="display:none"'}>Remove</button></div>
-        <input type="file" id="s-hifile" accept="image/*" style="display:none"></div>
+    <div class="card" style="margin-top:16px"><div class="card-h">${icon('image')}Promo banners (home top slider)</div><div class="card-b">
+      <div class="muted" style="font-size:12px;margin-bottom:10px">Wide banner images shown at the very top of the home page — like the big banner on top-up sites. Best ratio ~ 16:7 (e.g. 1200×525). Add several and they auto-slide. Max 8.</div>
+      <div id="s-bnlist"></div>
+      <button type="button" class="btn btn-ghost btn-sm" id="s-bnadd">${icon('plus')}Add banner image</button>
+      <input type="file" id="s-bnfile" accept="image/*" style="display:none">
     </div></div>
     <div class="card" style="margin-top:16px"><div class="card-h">${icon('cog')}General</div><div class="card-b">
       <div class="grid2"><div class="field"><label>Brand name A</label><input id="s-a" value="${esc(s.brandA || '')}"></div><div class="field"><label>Brand name B (colored)</label><input id="s-b" value="${esc(s.brandB || '')}"></div>
@@ -373,18 +373,33 @@
       if (up.ok) { S.logo = up.path; $('#s-logoprev').innerHTML = `<img src="${esc(up.path)}" style="width:100%;height:100%;object-fit:cover">`; $('#s-logodel').style.display = ''; toast('Logo ready — press Save'); } else toast('Upload failed');
     });
     document.querySelectorAll('[data-theme-pick]').forEach((b) => b.addEventListener('click', () => { $('#s-theme').value = b.dataset.themePick; }));
-    $('#s-hibtn').addEventListener('click', () => $('#s-hifile').click());
-    $('#s-hidel').addEventListener('click', () => { S.heroImg = ''; $('#s-hiprev').innerHTML = icon('eye'); $('#s-hidel').style.display = 'none'; });
-    $('#s-hifile').addEventListener('change', async (e) => {
-      const file = e.target.files[0]; if (!file) return;
+    renderBanners();
+    $('#s-bnadd').addEventListener('click', () => $('#s-bnfile').click());
+    $('#s-bnfile').addEventListener('change', async (e) => {
+      const file = e.target.files[0]; if (!file) return; e.target.value = '';
       if (file.size > 2 * 1024 * 1024) { toast('Image too big (max 2MB)'); return; }
+      if (S.banners.length >= 8) { toast('Max 8 banners'); return; }
       const dataUrl = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
       toast('Uploading...'); const up = await api('/api/admin/upload', { dataUrl });
-      if (up.ok) { S.heroImg = up.path; $('#s-hiprev').innerHTML = `<img src="${esc(up.path)}" style="width:100%;height:100%;object-fit:contain">`; $('#s-hidel').style.display = ''; toast('Image ready — press Save'); } else toast('Upload failed');
+      if (up.ok) { S.banners.push({ img: up.path, link: '' }); renderBanners(); toast('Banner added — press Save'); } else toast('Upload failed');
     });
   }
+  function renderBanners() {
+    const box = $('#s-bnlist'); if (!box) return;
+    box.innerHTML = S.banners.length ? S.banners.map((b, i) => `<div class="bn-row">
+      <div class="bn-prev"><img src="${esc(b.img)}" alt=""></div>
+      <input data-bn-link="${i}" value="${esc(b.link || '')}" maxlength="120" placeholder="Link on tap (optional) — e.g. service/ff-diamond or deposit">
+      <button type="button" class="ib" data-bn-up="${i}" title="Up">${icon('up')}</button>
+      <button type="button" class="ib" data-bn-down="${i}" title="Down">${icon('down')}</button>
+      <button type="button" class="ib ib-bad" data-bn-del="${i}" title="Remove">${icon('trash')}</button>
+    </div>`).join('') : `<div class="muted" style="font-size:12px;margin-bottom:10px">No banners yet — add one below.</div>`;
+    box.querySelectorAll('[data-bn-link]').forEach((inp) => inp.addEventListener('input', (e) => { S.banners[+e.target.dataset.bnLink].link = e.target.value; }));
+    box.querySelectorAll('[data-bn-del]').forEach((btn) => btn.addEventListener('click', () => { S.banners.splice(+btn.dataset.bnDel, 1); renderBanners(); }));
+    box.querySelectorAll('[data-bn-up]').forEach((btn) => btn.addEventListener('click', () => { const i = +btn.dataset.bnUp; if (i > 0) { [S.banners[i - 1], S.banners[i]] = [S.banners[i], S.banners[i - 1]]; renderBanners(); } }));
+    box.querySelectorAll('[data-bn-down]').forEach((btn) => btn.addEventListener('click', () => { const i = +btn.dataset.bnDown; if (i < S.banners.length - 1) { [S.banners[i + 1], S.banners[i]] = [S.banners[i], S.banners[i + 1]]; renderBanners(); } }));
+  }
   async function saveSettings() {
-    const settings = { heroTitle: $('#s-ht').value.trim(), heroSub: $('#s-hs').value.trim(), heroImg: S.heroImg || '', seoTitle: $('#s-seot').value.trim(), seoDesc: $('#s-seod').value.trim(), logo: S.logo || '', themeColor: $('#s-theme').value, brandA: $('#s-a').value.trim(), brandB: $('#s-b').value.trim(), tagline: $('#s-tbn').value.trim(), currency: $('#s-cur').value.trim() || '৳', minDeposit: Number($('#s-min').value) || 20, referralBonus: Number($('#s-ref').value) || 0, whatsapp: $('#s-wa').value.replace(/[^0-9]/g, '') };
+    const settings = { banners: S.banners || [], seoTitle: $('#s-seot').value.trim(), seoDesc: $('#s-seod').value.trim(), logo: S.logo || '', themeColor: $('#s-theme').value, brandA: $('#s-a').value.trim(), brandB: $('#s-b').value.trim(), tagline: $('#s-tbn').value.trim(), currency: $('#s-cur').value.trim() || '৳', minDeposit: Number($('#s-min').value) || 20, referralBonus: Number($('#s-ref').value) || 0, whatsapp: $('#s-wa').value.replace(/[^0-9]/g, '') };
     const r = await api('/api/admin/settings', { settings }); if (r.ok) toast('Saved ✓'); else toast('Error');
   }
 
