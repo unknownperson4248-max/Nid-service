@@ -469,7 +469,7 @@ async function syncUserDeposit(env, d) {
 const LAYOUT_DEFAULTS = {
   home: { hero: true, notices: true, products: true, recent: true },
   menu: { recharge: true, orders: true, referrals: true, profile: true },
-  nav: { orders: true, addMoney: true, referrals: true, profile: true },
+  nav: { orders: true, addMoney: true, transactions: true, profile: true },
 };
 function cleanLayout(l) {
   const out = {};

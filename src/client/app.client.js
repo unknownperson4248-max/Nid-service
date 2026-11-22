@@ -30,6 +30,7 @@
   const T = {
     dashboard: { bn: 'ড্যাশবোর্ড', en: 'Dashboard' }, addMoney: { bn: 'অ্যাড মানি', en: 'Add Money' }, recharge: { bn: 'রিচার্জ', en: 'Recharge' },
     orders: { bn: 'অর্ডার', en: 'Orders' }, referrals: { bn: 'রেফারেল', en: 'Referrals' }, profile: { bn: 'প্রোফাইল', en: 'Profile' },
+    transactions: { bn: 'লেনদেন', en: 'Transactions' }, allCats: { bn: 'সব', en: 'All' }, txnHistory: { bn: 'ট্রানজেকশন হিস্টোরি', en: 'Transaction history' },
     home: { bn: 'হোম', en: 'Home' }, services: { bn: 'সার্ভিস', en: 'Services' }, balance: { bn: 'ব্যালেন্স', en: 'Balance' },
     walletBalance: { bn: 'ওয়ালেট ব্যালেন্স', en: 'Wallet Balance' }, quickServices: { bn: 'কুইক সার্ভিস', en: 'Quick Services' },
     priceList: { bn: 'মূল্য তালিকা', en: 'Price List' }, recentOrders: { bn: 'সাম্প্রতিক অর্ডার', en: 'Recent Orders' },
@@ -57,7 +58,7 @@
     wrong: { bn: 'নম্বর বা পাসওয়ার্ড ভুল', en: 'Wrong number or password' }, exists: { bn: 'এই নম্বরে অ্যাকাউন্ট আছে', en: 'This number already has an account' },
     fillAll: { bn: 'সব ঘর পূরণ করুন', en: 'Fill all fields' }, details: { bn: 'ডিটেইলস', en: 'Details' },
   };
-  let S = { user: null, settings: null, services: [], cats: [], notices: [], live: [], lang: localStorage.getItem('lang') || 'bn', route: 'home', param: '', drawer: false };
+  let S = { user: null, settings: null, services: [], cats: [], notices: [], live: [], lang: localStorage.getItem('lang') || 'bn', route: 'home', param: '', drawer: false, homeCat: '__all' };
   const t = (o) => (o == null ? '' : typeof o === 'string' ? o : o[S.lang] || o.bn || o.en || '');
   const u = (k) => { const o = S.settings && S.settings.texts && S.settings.texts[k]; if (o) return o; const e = T[k]; return e ? (S.lang === 'en' ? e.en : e.bn) : k; };
   const L = (g, k) => !(S.settings && S.settings.layout && S.settings.layout[g] && S.settings.layout[g][k] === false);
@@ -131,14 +132,15 @@
     renderRoute();
   }
   function tabbar() {
-    const items = [['home', 'home', u('home')], ['orders', 'box', u('orders'), 'orders']].filter((x) => !x[3] || L('nav', x[3]));
-    const items2 = [['referrals', 'gift', u('referrals'), 'referrals'], ['profile', 'user', u('profile'), 'profile']].filter((x) => L('nav', x[3]));
-    const tab = ([r, ic, lbl]) => `<button class="tab ${S.route === r ? 'on' : ''}" data-nav="${r}">${icon(ic)}<span>${lbl}</span></button>`;
-    return `<nav class="tabbar"><div class="tabbar-in">
-      ${items.map(tab).join('')}
-      ${L('nav', 'addMoney') ? `<div class="tab-add"><button class="fab" data-nav="deposit" aria-label="${u('addMoney')}">${icon('plus')}</button><span>${u('addMoney')}</span></div>` : ''}
-      ${items2.map(tab).join('')}
-    </div></nav>`;
+    const defs = [
+      ['home', 'home', u('home'), 'home'],
+      ['orders', 'box', u('orders'), 'orders'],
+      ['deposit', 'plus', u('addMoney'), 'addMoney'],
+      ['transactions', 'wallet', u('transactions'), 'transactions'],
+      ['profile', 'user', u('profile'), 'profile'],
+    ].filter((x) => L('nav', x[3]));
+    const tab = ([r, ic, lbl, key]) => `<button class="tab ${key === 'addMoney' ? 'tab-pls' : ''} ${S.route === r ? 'on' : ''}" data-nav="${r}">${key === 'addMoney' ? `<span class="pls">${icon(ic)}</span>` : icon(ic)}<span>${esc(lbl)}</span></button>`;
+    return `<nav class="tabbar"><div class="tabbar-in">${defs.map(tab).join('')}</div></nav>`;
   }
   function drawer() {
     const drItem = (r, ic, lbl, on, color, img) => `<button class="dr-item ${on ? 'on' : ''}" data-nav="${r}"><span class="dr-ic ${img ? 'img' : ''}" ${!img && color ? `style="background:${color}!important"` : ''}>${img ? `<img src="${esc(img)}" alt="">` : icon(ic)}</span><span class="dr-l">${esc(lbl)}</span><span class="dr-ch">${icon('right')}</span></button>`;
@@ -178,18 +180,26 @@
     if (r === 'service') return viewService(v, p);
     if (r === 'orders') return viewOrders(v);
     if (r === 'deposit') return viewDeposit(v);
-    if (r === 'referrals') return viewReferrals(v);
+    if (r === 'transactions') return viewTransactions(v);
     if (r === 'profile') return viewProfile(v);
     viewHome(v);
   }
 
   function viewHome(v) {
     const active = S.services.filter((s) => s.active);
-    // products as boxes, grouped by category (the category list comes from admin)
-    const cats = (S.cats && S.cats.length ? S.cats : [{ id: '', name: { bn: 'সার্ভিস', en: 'Services' } }]).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
-    let catSections = cats.map((c) => { const items = active.filter((s) => (s.cat || '') === c.id); if (!items.length) return ''; return `<div class="sec-h">${icon('grid')}${esc(t(c.name))}</div><div class="qgrid">${items.map(qsCard).join('')}</div>`; }).join('');
-    const uncat = active.filter((s) => !cats.some((c) => c.id === (s.cat || ''))); if (uncat.length) catSections += `<div class="sec-h">${icon('grid')}${u('services')}</div><div class="qgrid">${uncat.map(qsCard).join('')}</div>`;
-    if (!active.length) catSections = `<div class="sec-h">${icon('bolt')}${u('quickServices')}</div><div class="qgrid">${emptyBox(u('services'))}</div>`;
+    // products filtered by a selectable category tab bar (categories shown side by side)
+    const allCats = (S.cats || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    const cats = allCats.filter((c) => active.some((s) => (s.cat || '') === c.id));
+    const uncat = active.filter((s) => !allCats.some((c) => c.id === (s.cat || '')));
+    const tabList = [{ id: '__all', name: { bn: u('allCats'), en: 'All' } }, ...cats];
+    if (uncat.length) tabList.push({ id: '__other', name: { bn: u('services'), en: 'Other' } });
+    if (!S.homeCat || !tabList.some((c) => c.id === S.homeCat)) S.homeCat = '__all';
+    const sel = S.homeCat;
+    const shown = sel === '__all' ? active : sel === '__other' ? uncat : active.filter((s) => (s.cat || '') === sel);
+    const catTabs = tabList.length > 1 ? `<div class="cat-tabs">${tabList.map((c) => `<button class="cat-tab ${c.id === sel ? 'on' : ''}" data-cat="${esc(c.id)}">${esc(t(c.name))}</button>`).join('')}</div>` : '';
+    const catSections = active.length
+      ? `${catTabs}<div class="qgrid">${shown.length ? shown.map(qsCard).join('') : emptyBox(u('services'))}</div>`
+      : `<div class="sec-h">${icon('bolt')}${u('quickServices')}</div><div class="qgrid">${emptyBox(u('services'))}</div>`;
     const B = S.settings || {};
     const banners = (B.banners || []).filter((b) => b && b.img);
     const bannerHtml = L('home', 'hero') && banners.length ? `<div class="promo">
@@ -209,6 +219,7 @@
       <div class="card">${S.live.length ? S.live.map(liveRow).join('') : emptyBox(u('noOrders'))}</div>` : ''}
 
       <div style="height:10px"></div>`;
+    $$('.cat-tab').forEach((b) => b.addEventListener('click', () => { S.homeCat = b.dataset.cat; viewHome(v); }));
     if (banners.length > 1) initPromo(v);
   }
 
@@ -443,17 +454,19 @@
   }
 
   /* ---------- referrals ---------- */
-  async function viewReferrals(v) {
-    v.innerHTML = `<div class="ph"><button class="back" data-back>${icon('left')}</button><h2>${u('referrals')}</h2></div><div class="spin"></div>`;
-    const r = await api('/api/referrals');
-    if (S.route !== 'referrals') return;
-    const link = location.origin + '/?ref=' + (r.ref || '');
-    v.innerHTML = `<div class="ph"><button class="back" data-back>${icon('left')}</button><h2>${u('referrals')}</h2></div>
-      <div class="hero"><div class="hero-lbl">${u('yourRef')}</div><div class="hero-bal" style="font-size:30px;letter-spacing:.1em">${esc(r.ref || '')}</div>
-        <div class="hero-row"><button class="hero-btn solid" data-copy="${esc(link)}">${icon('copy')}${u('copy')}</button><button class="hero-btn" data-share="${esc(link)}">${icon('gift')}${u('share')}</button></div></div>
-      <div class="qgrid" style="margin-top:14px"><div class="card card-pad" style="text-align:center"><div class="muted" style="font-size:12px">${u('refBy')}</div><div style="font-family:var(--disp);font-weight:800;font-size:28px;color:var(--brand)">${r.count || 0}</div></div>
-        <div class="card card-pad" style="text-align:center"><div class="muted" style="font-size:12px">${u('earned')}</div><div style="font-family:var(--disp);font-weight:800;font-size:28px;color:var(--brand)">${money(r.earned || 0)}</div></div></div>
-      <div class="notice" style="margin-top:14px"><div class="notice-b">${u('refNote')} ${S.lang === 'en' ? 'Bonus' : 'বোনাস'}: ${money(r.bonus || 0)}</div></div>`;
+  async function viewTransactions(v) {
+    const en = S.lang === 'en';
+    v.innerHTML = `<div class="ph"><button class="back" data-back>${icon('left')}</button><h2>${u('transactions')}</h2></div>
+      <div class="txn-bal"><div class="txn-bal-t"><span>${u('walletBalance')}</span><b>${money(S.user.balance)}</b></div>
+        <button class="txn-add" data-nav="deposit">${icon('plus')}<span>${u('addMoney')}</span></button></div>
+      <div class="sec-h">${icon('clock')}${u('txnHistory')}</div>
+      <div class="card" id="txn-list"><div class="spin"></div></div><div style="height:10px"></div>`;
+    const dr = await api('/api/deposits');
+    if (S.route !== 'transactions') return;
+    const el = $('#txn-list'); if (!el) return;
+    el.innerHTML = (dr.items && dr.items.length)
+      ? dr.items.map((d) => `<div class="ord-row"><span class="ord-av txn-in">${icon('wallet')}</span><span class="ord-main"><b>+ ${money(d.amount)} • ${esc(d.method)}</b><small>${esc(d.id)} • ${ago(d.ts)}</small></span>${statusBadge(d.status === 'pending' ? 'pending' : d.status === 'approved' ? 'approved' : 'rejected')}</div>`).join('')
+      : emptyBox(en ? 'No transactions yet' : 'এখনো কোনো লেনদেন নেই');
   }
 
   /* ---------- profile ---------- */

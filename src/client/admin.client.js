@@ -321,7 +321,7 @@
     const groups = [
       ['home', 'Dashboard sections', [['hero', 'Promo banner slider'], ['notices', 'Notice board'], ['products', 'Products (category boxes)'], ['recent', 'Recent orders (LIVE)']]],
       ['menu', '3-dot menu items', [['orders', 'Order history'], ['referrals', 'Referrals'], ['profile', 'Profile']]],
-      ['nav', 'Bottom navigation bar', [['orders', 'Orders'], ['addMoney', '+ Add money (center)'], ['referrals', 'Referrals'], ['profile', 'Profile']]],
+      ['nav', 'Bottom navigation bar', [['orders', 'Orders'], ['addMoney', '+ Add money'], ['transactions', 'Transactions (money history)'], ['profile', 'Profile']]],
     ];
     c.innerHTML = groups.map(([g, title, items]) => `<div class="card" style="margin-bottom:16px"><div class="card-h">${icon('grid')}${title}</div><div class="card-b">
       ${items.map(([k, lbl]) => `<label class="flex" style="justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)"><span style="font-weight:600">${lbl}</span><input type="checkbox" data-lay="${g}:${k}" ${!(l[g] && l[g][k] === false) ? 'checked' : ''} style="width:22px;height:22px"></label>`).join('')}

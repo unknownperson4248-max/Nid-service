@@ -747,3 +747,30 @@ select option{background:#141922;color:var(--lx-ink)}
 .promo-dots{display:flex;justify-content:center;gap:6px;margin-top:8px}
 .promo-dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.22);transition:all .25s}
 .promo-dots i.on{width:20px;border-radius:5px;background:var(--lx-gold)}
+
+/* ======================= uniform nav + category tabs + transactions ======================= */
+/* add-money as a small inline nav item (not a big raised FAB) */
+.tab-pls .pls{display:grid;place-items:center;width:33px;height:33px;border-radius:11px;background:var(--gold-g);color:#1a1206;box-shadow:0 6px 14px -8px rgba(201,153,47,.7)}
+.tab-pls .pls .ic{width:19px;height:19px;stroke-width:2.6}
+.tab-pls{color:var(--lx-muted)}
+.tab-pls.on{color:var(--lx-gold)!important}
+.tab-pls.on .pls{box-shadow:0 8px 16px -6px rgba(201,153,47,.9)}
+.tab-pls::before{display:none!important}
+
+/* category filter tabs (side-by-side, selectable) */
+.cat-tabs{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 0 12px;margin-top:2px}
+.cat-tabs::-webkit-scrollbar{display:none}
+.cat-tab{all:unset;cursor:pointer;white-space:nowrap;font-size:12.5px;font-weight:700;padding:8px 15px;border-radius:999px;color:var(--lx-sub);background:var(--lx-card);border:1px solid var(--lx-line);transition:background .18s,color .18s,transform .12s}
+.cat-tab.on{color:#1a1206;background:var(--gold-g);border-color:transparent;box-shadow:0 10px 20px -10px rgba(201,153,47,.6)}
+.cat-tab:active{transform:scale(.95)}
+
+/* transactions page */
+.txn-bal{display:flex;align-items:center;gap:12px;padding:16px;border-radius:18px;margin-bottom:14px;
+  background:linear-gradient(135deg,#2a2112,#1a1407);border:1px solid rgba(232,195,121,.3)}
+.txn-bal-t{flex:1;min-width:0}
+.txn-bal-t span{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:rgba(232,195,121,.75);font-weight:600}
+.txn-bal-t b{font-family:var(--disp);font-weight:800;font-size:26px;color:var(--lx-gold)}
+.txn-add{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;flex:none;background:var(--gold-g);color:#1a1206;font-weight:800;font-size:13px;padding:10px 15px;border-radius:13px;box-shadow:0 12px 22px -12px rgba(201,153,47,.7)}
+.txn-add .ic{width:16px;height:16px;stroke-width:2.6}
+.txn-add:active{transform:scale(.96)}
+.txn-in{color:var(--lx-gold)!important}
