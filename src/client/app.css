@@ -774,3 +774,31 @@ select option{background:#141922;color:var(--lx-ink)}
 .txn-add .ic{width:16px;height:16px;stroke-width:2.6}
 .txn-add:active{transform:scale(.96)}
 .txn-in{color:var(--lx-gold)!important}
+
+/* ======================= animated 3D / glossy gold buttons ======================= */
+.btn:not(.btn-ghost),.txn-add,.dr-wbtn,.tab-pls .pls,.hb-btn{position:relative;overflow:hidden;
+  transition:transform .13s cubic-bezier(.2,.8,.3,1),box-shadow .13s,filter .2s}
+/* lively gradient-shift gold fill */
+.btn:not(.btn-ghost){background:linear-gradient(120deg,#f7ddA3,#e8c074 34%,#c9a24a 64%,#f1d596)!important;background-size:220% 100%;
+  animation:btnShift 6.5s ease-in-out infinite;
+  box-shadow:0 3px 0 #9a6f1f,0 12px 22px -10px rgba(201,153,47,.6),inset 0 1px 0 rgba(255,255,255,.55),inset 0 -2px 6px rgba(130,92,16,.45)!important}
+@keyframes btnShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+/* 3D tactile press — button pushes down into its base edge */
+.btn:not(.btn-ghost):active{transform:translateY(3px);box-shadow:0 0 0 #9a6f1f,0 4px 10px -6px rgba(201,153,47,.5),inset 0 1px 0 rgba(255,255,255,.4),inset 0 -1px 4px rgba(130,92,16,.4)!important}
+.txn-add:active,.dr-wbtn:active,.hb-btn:active{transform:translateY(2px) scale(.99)}
+.tab-pls:active .pls{transform:translateY(1px) scale(.95)}
+/* animated glossy sheen sweep across the primary button */
+.btn:not(.btn-ghost)::after{content:"";position:absolute;top:0;left:-72%;width:46%;height:100%;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.6),transparent);transform:skewX(-18deg);animation:btnSheen 4s ease-in-out infinite}
+@keyframes btnSheen{0%,10%{left:-72%}50%{left:135%}100%{left:135%}}
+/* ghost buttons: tactile press + soft fill on tap */
+.btn-ghost{transition:transform .13s,background .2s,border-color .2s}
+.btn-ghost:active{transform:translateY(2px) scale(.99);background:rgba(232,195,121,.1)!important;border-color:rgba(232,195,121,.4)!important}
+/* desktop hover lift (magnetic-style) where a real pointer exists */
+@media (hover:hover){
+  .btn:not(.btn-ghost):hover{filter:brightness(1.06);box-shadow:0 3px 0 #9a6f1f,0 18px 32px -10px rgba(201,153,47,.8),inset 0 1px 0 rgba(255,255,255,.6),inset 0 -2px 6px rgba(130,92,16,.45)!important}
+  .qs:hover{transform:translateY(-3px)}
+  .cat-tab:hover{filter:brightness(1.05)}
+  .txn-add:hover,.dr-wbtn:hover{filter:brightness(1.06);transform:translateY(-1px)}
+}
+@media (prefers-reduced-motion:reduce){.btn:not(.btn-ghost){animation:none}.btn:not(.btn-ghost)::after{display:none}}
