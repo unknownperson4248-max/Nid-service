@@ -819,3 +819,11 @@ select option{background:#141922;color:var(--lx-ink)}
 .ref-stat{background:var(--lx-card);border:1px solid var(--lx-line);border-radius:14px;padding:14px;text-align:center}
 .ref-stat span{display:block;font-size:12px;color:var(--lx-muted);margin-bottom:3px}
 .ref-stat b{font-family:var(--disp);font-weight:800;font-size:26px;color:var(--lx-gold)}
+
+/* Google sign-in button + divider */
+.or-div{display:flex;align-items:center;gap:12px;margin:18px 0;color:var(--lx-muted);font-size:12px}
+.or-div::before,.or-div::after{content:"";flex:1;height:1px;background:var(--lx-line)}
+.g-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;box-sizing:border-box;padding:12px;border-radius:14px;background:#fff;color:#1f2430;font-weight:700;font-size:14.5px;border:0;box-shadow:0 12px 24px -12px rgba(0,0,0,.65);transition:transform .12s,filter .2s}
+.g-btn .ic{width:20px;height:20px}
+.g-btn:active{transform:scale(.98)}
+@media (hover:hover){.g-btn:hover{filter:brightness(.97)}}

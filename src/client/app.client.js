@@ -6,6 +6,7 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   const ICONS = {
+    google: '<path fill="#4285F4" stroke="none" d="M21.6 12.23c0-.68-.06-1.33-.17-1.96H12v3.71h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.23c1.89-1.74 2.99-4.3 2.99-7.28z"/><path fill="#34A853" stroke="none" d="M12 22c2.7 0 4.96-.9 6.62-2.42l-3.23-2.51c-.9.6-2.04.96-3.39.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.59A10 10 0 0 0 12 22z"/><path fill="#FBBC05" stroke="none" d="M6.41 13.91a6 6 0 0 1 0-3.82V7.5H3.07a10 10 0 0 0 0 9z"/><path fill="#EA4335" stroke="none" d="M12 5.97c1.47 0 2.79.5 3.83 1.5l2.86-2.86A10 10 0 0 0 12 2a10 10 0 0 0-8.93 5.5l3.34 2.59C7.2 7.73 9.4 5.97 12 5.97z"/>',
     menu: '<path d="M3 6h18M3 12h18M3 18h18"/>', wallet: '<path d="M3 7h15a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l12-3v3"/><circle cx="16.5" cy="12.5" r="1.3" fill="currentColor" stroke="none"/>',
     bell: '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
     home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>', box: '<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
@@ -95,6 +96,8 @@
         <div class="field"><label>${u('refOpt')}</label><input name="ref" maxlength="10" placeholder="ABC123"></div>` : ''}
         <button class="btn" type="submit">${authMode === 'login' ? u('login') : u('register')}${icon('right')}</button>
       </form>
+      ${B.googleOn ? `<div class="or-div"><span>${u('orDiv')}</span></div>
+      <a class="g-btn" href="/auth/google/start">${icon('google')}<span>${u('gLogin')}</span></a>` : ''}
       <p style="text-align:center;margin-top:16px;color:var(--muted);font-size:13.5px">${authMode === 'login' ? u('noAcc') : u('haveAcc')}
         <a href="#" data-am="${authMode === 'login' ? 'register' : 'login'}" style="color:var(--brand);font-weight:700">${authMode === 'login' ? u('register') : u('login')}</a></p>
     </div></div>`;
@@ -552,7 +555,10 @@
   /* ---------- boot ---------- */
   async function loadHome() { const r = await api('/api/home'); if (r.ok) { S.settings = r.settings; S.services = r.services || []; S.cats = r.cats || []; S.notices = r.notices || []; S.live = r.live || []; if (r.user) S.user = r.user; } }
   async function boot() {
-    const qref = new URLSearchParams(location.search).get('ref'); if (qref) sessionStorage.setItem('ref', qref);
+    const qs = new URLSearchParams(location.search);
+    const qref = qs.get('ref'); if (qref) sessionStorage.setItem('ref', qref);
+    const ge = qs.get('e');
+    if (ge) { const en = S.lang === 'en'; const m = ge === 'google_off' ? (en ? 'Google login is not set up' : 'Google লগইন সেট করা নেই') : ge === 'blocked' ? (en ? 'Account blocked' : 'অ্যাকাউন্ট ব্লকড') : (en ? 'Google sign-in failed, try again' : 'Google লগইন ব্যর্থ, আবার চেষ্টা করুন'); setTimeout(() => toast(m), 400); history.replaceState(null, '', location.pathname + location.hash); }
     const me = await api('/api/me'); S.settings = me.settings;
     if (me.user) { S.user = me.user; await loadHome(); }
     if (!location.hash) location.hash = '#home';

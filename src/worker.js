@@ -295,10 +295,52 @@ function pubMethods(list) {
 }
 const pubBanners = (list) => (Array.isArray(list) ? list : []).map((b) => ({ img: safeImg(b && b.img), link: clip((b && b.link) || '', 120) })).filter((b) => b.img).slice(0, 8);
 const pubSettings = (s) => ({ heroTitle: s.heroTitle, heroSub: s.heroSub, heroImg: safeImg(s.heroImg), banners: pubBanners(s.banners), texts: cleanTexts(s.texts), layout: cleanLayout(s.layout), brandA: s.brandA, brandB: s.brandB, logo: safeImg(s.logo), themeColor: safeHex(s.themeColor), tagline: s.tagline, currency: s.currency, minDeposit: s.minDeposit,
-  depositMethods: pubMethods(s.depositMethods), referralBonus: s.referralBonus, whatsapp: s.whatsapp });
+  depositMethods: pubMethods(s.depositMethods), referralBonus: s.referralBonus, whatsapp: s.whatsapp,
+  googleOn: !!(s.googleOn && s.googleCID && s.googleSecret) });
 async function bumpStat(env, k) { const key = 'stat:' + k; const n = +((await env.DATA.get(key)) || 0); await env.DATA.put(key, String(n + 1)); }
 
 /* ---------------- admin APIs ---------------- */
+async function handleGoogle(req, env, url, path, secure) {
+  const s = await getSettings(env);
+  const redirectUri = url.origin + '/auth/google/callback';
+  if (!s.googleOn || !s.googleCID || !s.googleSecret) return Response.redirect(url.origin + '/?e=google_off', 302);
+  if (path === '/auth/google/start') {
+    const state = rid(24);
+    await env.DATA.put('gstate:' + state, '1', { expirationTtl: 600 });
+    const auth = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+      client_id: s.googleCID, redirect_uri: redirectUri, response_type: 'code', scope: 'openid email profile', state, access_type: 'online', prompt: 'select_account' });
+    return Response.redirect(auth, 302);
+  }
+  if (path === '/auth/google/callback') {
+    const code = url.searchParams.get('code'), state = url.searchParams.get('state');
+    if (!code || !state) return Response.redirect(url.origin + '/?e=google_cancel', 302);
+    if (!(await env.DATA.get('gstate:' + state))) return Response.redirect(url.origin + '/?e=google_state', 302);
+    await env.DATA.delete('gstate:' + state);
+    const tr = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ code, client_id: s.googleCID, client_secret: s.googleSecret, redirect_uri: redirectUri, grant_type: 'authorization_code' }) });
+    const tok = await tr.json().catch(() => null);
+    if (!tok || !tok.access_token) return Response.redirect(url.origin + '/?e=google_token', 302);
+    const info = await (await fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { authorization: 'Bearer ' + tok.access_token } })).json().catch(() => null);
+    const email = info && info.email ? String(info.email).toLowerCase() : '';
+    if (!email || !EMAIL_RE.test(email)) return Response.redirect(url.origin + '/?e=google_email', 302);
+    let uid = await env.DATA.get('email:' + email);
+    let u = uid ? await env.DATA.get('u:' + uid, 'json') : null;
+    if (!u) {
+      const anyUser = (await env.DATA.list({ prefix: 'u:', limit: 1 })).keys.length > 0;
+      const salt = rid(16);
+      u = { id: rid(12), name: clip((info && info.name) || email.split('@')[0], 60), email, phone: '', salt, iter: PBKDF2_ITER, hash: await pbkdf2(rid(24), salt, PBKDF2_ITER), balance: 0, role: anyUser ? 'user' : 'admin', ref: rid(6).toUpperCase(), refBy: '', ts: now(), google: true };
+      await env.DATA.put('u:' + u.id, JSON.stringify(u));
+      await env.DATA.put('email:' + email, u.id);
+      if (u.ref) await env.DATA.put('ref:' + u.ref, u.id);
+    }
+    if (u.blocked) return Response.redirect(url.origin + '/?e=blocked', 302);
+    const token = rid(28);
+    await env.DATA.put('sess:' + token, JSON.stringify({ uid: u.id, ts: now() }), { expirationTtl: SESSION_DAYS * 86400 });
+    return new Response(null, { status: 302, headers: { location: url.origin + '/#home', 'set-cookie': cookie('sid', token, SESSION_DAYS, secure) } });
+  }
+  return new Response('Not found', { status: 404 });
+}
+
 async function handleAdmin(req, env, url, path, u) {
   if (!u || u.role !== 'admin') return json({ ok: false, error: 'forbidden' }, 403);
 
@@ -482,6 +524,8 @@ async function handleAdmin(req, env, url, path, u) {
       next.heroTitle = clip(next.heroTitle, 80); next.heroSub = clip(next.heroSub, 160); next.heroImg = safeImg(next.heroImg);
       if (Array.isArray(next.banners)) next.banners = next.banners.slice(0, 8).map((b) => ({ img: safeImg(b && b.img), link: clip((b && b.link) || '', 120) })).filter((b) => b.img);
       next.adminPass = cur.adminPass || null; // only changed via /api/admin/setpass, never the generic save
+      next.googleOn = !!next.googleOn; next.googleCID = clip(next.googleCID, 200);
+      next.googleSecret = (typeof b.settings.googleSecret === 'string' && b.settings.googleSecret.trim()) ? clip(b.settings.googleSecret, 200) : (cur.googleSecret || '');
       const hexish = (v, fallback) => (/^#[0-9a-f]{3,8}$/i.test(String(v || '')) ? String(v) : fallback);
       if (Array.isArray(next.depositMethods)) next.depositMethods = next.depositMethods.slice(0, 12).map((m) => ({
         id: clip(m.id, 20) || rid(8), label: clip(m.label, 30), color: hexish(m.color, '#0f766e'), active: m.active !== false,
@@ -496,7 +540,7 @@ async function handleAdmin(req, env, url, path, u) {
       return json({ ok: true });
     }
     const st = await getSettings(env);
-    return json({ ok: true, settings: { ...st, adminPass: undefined, texts: cleanTexts(st.texts), layout: cleanLayout(st.layout) }, adminPassSet: !!st.adminPass, textDefaults: TEXT_DEFAULTS });
+    return json({ ok: true, settings: { ...st, adminPass: undefined, googleSecret: undefined, texts: cleanTexts(st.texts), layout: cleanLayout(st.layout) }, adminPassSet: !!st.adminPass, googleSecretSet: !!st.googleSecret, textDefaults: TEXT_DEFAULTS });
   }
 
   return json({ ok: false, error: 'not_found' }, 404);
@@ -569,6 +613,7 @@ export default {
     const secure = url.protocol === 'https:';
     try {
       if (path.startsWith('/api/auth/')) return await handleAuth(req, env, url, path, secure);
+      if (path.startsWith('/auth/google/')) return await handleGoogle(req, env, url, path, secure);
       const u = await userFromReq(req, env);
       if (path.startsWith('/api/admin/')) return await handleAdmin(req, env, url, path, u);
       if (path.startsWith('/api/')) return await handleApi(req, env, url, path, u, secure);

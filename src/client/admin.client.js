@@ -375,6 +375,12 @@
       <div class="flex"><button type="button" class="btn btn-sm" id="s-admset">${icon('check')}${r.adminPassSet ? 'Change password' : 'Set password'}</button>${r.adminPassSet ? `<button type="button" class="btn btn-bad btn-sm" id="s-admdel">${icon('trash')}Remove</button>` : ''}</div>
       ${r.adminPassSet ? '' : '<div class="muted" style="font-size:11px;margin-top:8px">Note: remember this password — if forgotten you will need to reset it from the server.</div>'}
     </div></div>
+    <div class="card" style="margin-top:16px"><div class="card-h">${icon('lock')}Google (Gmail) login</div><div class="card-b">
+      <label class="flex" style="justify-content:space-between;margin-bottom:12px"><span>Enable "Sign in with Google" ${s.googleOn ? '<b style="color:#16a34a">ON</b>' : '<b>OFF</b>'}</span><input type="checkbox" id="s-gon" ${s.googleOn ? 'checked' : ''}></label>
+      <div class="field"><label>Google Client ID</label><input id="s-gcid" maxlength="200" value="${esc(s.googleCID || '')}" placeholder="xxxxx.apps.googleusercontent.com"></div>
+      <div class="field"><label>Google Client Secret ${r.googleSecretSet ? '<span style="color:#16a34a">(saved — blank = keep)</span>' : ''}</label><input id="s-gsec" type="password" autocomplete="new-password" maxlength="200" placeholder="${r.googleSecretSet ? '••••••••' : 'GOCSPX-...'}"></div>
+      <div class="muted" style="font-size:12px">Create a Web OAuth client in <b>Google Cloud → Credentials</b>. Set the <b>Authorized redirect URI</b> to:<br><code style="user-select:all;word-break:break-all">${esc(location.origin)}/auth/google/callback</code><br>and <b>Authorized JavaScript origin</b> to <code>${esc(location.origin)}</code>. Then paste Client ID + Secret above and Save.</div>
+    </div></div>
     <div style="margin-top:16px"><button class="btn btn-ok" id="s-save">${icon('check')}Save settings</button></div>`;
     $('#s-save').addEventListener('click', saveSettings);
     $('#s-admset').addEventListener('click', async () => { const p = $('#s-admpass').value; if (p.length < 4) { toast('Min 4 characters'); return; } const rr = await api('/api/admin/setpass', { pass: p }); if (rr.ok) { toast('Admin password saved ✓'); vSettings(); } else toast(rr.error === 'short' ? 'Min 4 characters' : 'Error'); });
@@ -415,7 +421,8 @@
     box.querySelectorAll('[data-bn-down]').forEach((btn) => btn.addEventListener('click', () => { const i = +btn.dataset.bnDown; if (i < S.banners.length - 1) { [S.banners[i + 1], S.banners[i]] = [S.banners[i], S.banners[i + 1]]; renderBanners(); } }));
   }
   async function saveSettings() {
-    const settings = { banners: S.banners || [], seoTitle: $('#s-seot').value.trim(), seoDesc: $('#s-seod').value.trim(), logo: S.logo || '', themeColor: $('#s-theme').value, brandA: $('#s-a').value.trim(), brandB: $('#s-b').value.trim(), tagline: $('#s-tbn').value.trim(), currency: $('#s-cur').value.trim() || '৳', minDeposit: Number($('#s-min').value) || 20, referralBonus: Number($('#s-ref').value) || 0, whatsapp: $('#s-wa').value.replace(/[^0-9]/g, '') };
+    const settings = { banners: S.banners || [], seoTitle: $('#s-seot').value.trim(), seoDesc: $('#s-seod').value.trim(), logo: S.logo || '', themeColor: $('#s-theme').value, brandA: $('#s-a').value.trim(), brandB: $('#s-b').value.trim(), tagline: $('#s-tbn').value.trim(), currency: $('#s-cur').value.trim() || '৳', minDeposit: Number($('#s-min').value) || 20, referralBonus: Number($('#s-ref').value) || 0, whatsapp: $('#s-wa').value.replace(/[^0-9]/g, ''), googleOn: $('#s-gon') ? $('#s-gon').checked : false, googleCID: $('#s-gcid') ? $('#s-gcid').value.trim() : '' };
+    { const gsec = $('#s-gsec') ? $('#s-gsec').value : ''; if (gsec) settings.googleSecret = gsec; }
     const r = await api('/api/admin/settings', { settings }); if (r.ok) toast('Saved ✓'); else toast('Error');
   }
 
