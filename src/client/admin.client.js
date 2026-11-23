@@ -346,7 +346,9 @@
     const r = await api('/api/admin/settings'); const s = r.settings || {};
     S.logo = s.logo || ''; S.heroImg = s.heroImg || '';
     S.banners = (Array.isArray(s.banners) ? s.banners : []).map((b) => ({ img: (b && b.img) || '', link: (b && b.link) || '' })).filter((b) => b.img);
-    c.innerHTML = `<div class="card"><div class="card-h">${icon('eye')}Website, SEO & Theme</div><div class="card-b">
+    const setTabs = [['general', 'eye', 'General'], ['banner', 'image', 'Banner'], ['contact', 'home', 'Contact'], ['rules', 'edit', 'Rules'], ['login', 'lock', 'Login']];
+    c.innerHTML = `<div class="set-tabs">${setTabs.map(([k, ic, l]) => `<button data-settab="${k}" class="${(S.setTab || 'general') === k ? 'on' : ''}">${icon(ic)}<span>${l}</span></button>`).join('')}</div>
+    <div class="card" data-sb="general"><div class="card-h">${icon('eye')}Website, SEO & Theme</div><div class="card-b">
       <div class="field"><label>Website title (browser tab & Google)</label><input id="s-seot" maxlength="90" value="${esc(s.seoTitle || '')}" placeholder="e.g. WizeFF TopUp – Free Fire Diamond Top Up BD"></div>
       <div class="field"><label>Description (Google & share preview)</label><textarea id="s-seod" maxlength="300" placeholder="Short line about your service">${esc(s.seoDesc || '')}</textarea><div class="muted" style="font-size:11px">Shows under your site name on Google and when the link is shared.</div></div>
       <div class="grid2">
@@ -357,31 +359,31 @@
           <div class="flex" style="margin-top:8px">${['#0f766e', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#0e1726', '#16a34a', '#dc2626'].map((h) => `<button type="button" data-theme-pick="${h}" style="width:28px;height:28px;border-radius:8px;border:2px solid #fff;box-shadow:0 0 0 1px #cbd5e1;background:${h}"></button>`).join('')}</div></div>
       </div>
     </div></div>
-    <div class="card" style="margin-top:16px"><div class="card-h">${icon('image')}Promo banners (home top slider)</div><div class="card-b">
+    <div class="card" data-sb="banner" style="margin-top:16px"><div class="card-h">${icon('image')}Promo banners (home top slider)</div><div class="card-b">
       <div class="muted" style="font-size:12px;margin-bottom:10px">Wide banner images shown at the very top of the home page — like the big banner on top-up sites. Best ratio ~ 16:7 (e.g. 1200×525). Add several and they auto-slide. Max 8.</div>
       <div id="s-bnlist"></div>
       <button type="button" class="btn btn-ghost btn-sm" id="s-bnadd">${icon('plus')}Add banner image</button>
       <input type="file" id="s-bnfile" accept="image/*" style="display:none">
     </div></div>
-    <div class="card" style="margin-top:16px"><div class="card-h">${icon('cog')}General</div><div class="card-b">
+    <div class="card" data-sb="general" style="margin-top:16px"><div class="card-h">${icon('cog')}General</div><div class="card-b">
       <div class="grid2"><div class="field"><label>Brand name A</label><input id="s-a" value="${esc(s.brandA || '')}"></div><div class="field"><label>Brand name B (colored)</label><input id="s-b" value="${esc(s.brandB || '')}"></div>
       <div class="field"><label>Tagline</label><input id="s-tbn" value="${esc(tl(s.tagline))}"></div><div></div>
       <div class="field"><label>Currency</label><input id="s-cur" value="${esc(s.currency || '৳')}" maxlength="3"></div><div class="field"><label>Min deposit (৳)</label><input id="s-min" type="number" value="${s.minDeposit || 20}"></div>
       <div class="field"><label>Referral bonus (৳)</label><input id="s-ref" type="number" value="${s.referralBonus || 0}"></div><div class="field"><label>WhatsApp (support)</label><input id="s-wa" value="${esc(s.whatsapp || '')}" placeholder="8801XXXXXXXXX"></div></div>
     </div></div>
-    <div class="card" style="margin-top:16px"><div class="card-h">${icon('lock')}Admin panel password</div><div class="card-b">
+    <div class="card" data-sb="login" style="margin-top:16px"><div class="card-h">${icon('lock')}Admin panel password</div><div class="card-b">
       <div class="muted" style="font-size:12px;margin-bottom:10px">Extra password asked when opening the admin panel (after login). ${r.adminPassSet ? '<b style="color:#16a34a">Currently ON</b>' : 'Currently <b>OFF</b>'} • min 4 characters.</div>
       <div class="field"><label>${r.adminPassSet ? 'New admin password' : 'Set admin password'}</label><input id="s-admpass" type="password" autocomplete="new-password" minlength="4" maxlength="100" placeholder="••••••"></div>
       <div class="flex"><button type="button" class="btn btn-sm" id="s-admset">${icon('check')}${r.adminPassSet ? 'Change password' : 'Set password'}</button>${r.adminPassSet ? `<button type="button" class="btn btn-bad btn-sm" id="s-admdel">${icon('trash')}Remove</button>` : ''}</div>
       ${r.adminPassSet ? '' : '<div class="muted" style="font-size:11px;margin-top:8px">Note: remember this password — if forgotten you will need to reset it from the server.</div>'}
     </div></div>
-    <div class="card" style="margin-top:16px"><div class="card-h">${icon('lock')}Google (Gmail) login</div><div class="card-b">
+    <div class="card" data-sb="login" style="margin-top:16px"><div class="card-h">${icon('lock')}Google (Gmail) login</div><div class="card-b">
       <label class="flex" style="justify-content:space-between;margin-bottom:12px"><span>Enable "Sign in with Google" ${s.googleOn ? '<b style="color:#16a34a">ON</b>' : '<b>OFF</b>'}</span><input type="checkbox" id="s-gon" ${s.googleOn ? 'checked' : ''}></label>
       <div class="field"><label>Google Client ID</label><input id="s-gcid" maxlength="200" value="${esc(s.googleCID || '')}" placeholder="xxxxx.apps.googleusercontent.com"></div>
       <div class="field"><label>Google Client Secret ${r.googleSecretSet ? '<span style="color:#16a34a">(saved — blank = keep)</span>' : ''}</label><input id="s-gsec" type="password" autocomplete="new-password" maxlength="200" placeholder="${r.googleSecretSet ? '••••••••' : 'GOCSPX-...'}"></div>
       <div class="muted" style="font-size:12px">Create a Web OAuth client in <b>Google Cloud → Credentials</b>. Set the <b>Authorized redirect URI</b> to:<br><code style="user-select:all;word-break:break-all">${esc(location.origin)}/auth/google/callback</code><br>and <b>Authorized JavaScript origin</b> to <code>${esc(location.origin)}</code>. Then paste Client ID + Secret above and Save.</div>
     </div></div>
-    <div class="card" style="margin-top:16px"><div class="card-h">${icon('home')}Footer & contact</div><div class="card-b">
+    <div class="card" data-sb="contact" style="margin-top:16px"><div class="card-h">${icon('home')}Footer & contact</div><div class="card-b">
       <div class="grid2">
         <div class="field"><label>Telegram (username or link)</label><input id="s-tg" maxlength="120" value="${esc(s.telegram || '')}" placeholder="@username or https://t.me/.."></div>
         <div class="field"><label>Telegram channel link</label><input id="s-tgc" maxlength="120" value="${esc(s.telegramCh || '')}" placeholder="https://t.me/yourchannel"></div>
@@ -391,11 +393,14 @@
       <div class="field"><label>Privacy Policy</label><textarea id="s-priv" rows="5" maxlength="4000" placeholder="Shown as a link in the footer (leave blank to hide)">${esc(s.privacy || '')}</textarea></div>
       <div class="muted" style="font-size:12px">WhatsApp & contact buttons use the WhatsApp number from the General card below.</div>
     </div></div>
-    <div class="card" style="margin-top:16px"><div class="card-h">${icon('edit')}Rules &amp; Regulations (Terms &amp; Conditions)</div><div class="card-b">
+    <div class="card" data-sb="rules" style="margin-top:16px"><div class="card-h">${icon('edit')}Rules &amp; Regulations (Terms &amp; Conditions)</div><div class="card-b">
       <div class="field"><textarea id="s-rules" rows="6" maxlength="4000" placeholder="Write your rules / terms — shown at the bottom of the home page">${esc(s.rules || '')}</textarea></div>
       <div class="muted" style="font-size:12px">Appears at the bottom of the home dashboard, next to your brand logo. Leave blank to hide.</div>
     </div></div>
     <div style="margin-top:16px"><button class="btn btn-ok" id="s-save">${icon('check')}Save settings</button></div>`;
+    const applySetTab = () => { const sec = S.setTab || 'general'; document.querySelectorAll('.set-tabs [data-settab]').forEach((bb) => bb.classList.toggle('on', bb.dataset.settab === sec)); document.querySelectorAll('#content [data-sb]').forEach((cd) => { cd.style.display = cd.dataset.sb === sec ? '' : 'none'; }); };
+    document.querySelectorAll('.set-tabs [data-settab]').forEach((bb) => bb.addEventListener('click', () => { S.setTab = bb.dataset.settab; applySetTab(); const m = $('#content'); if (m) m.scrollTop = 0; window.scrollTo(0, 0); }));
+    applySetTab();
     $('#s-save').addEventListener('click', saveSettings);
     $('#s-admset').addEventListener('click', async () => { const p = $('#s-admpass').value; if (p.length < 4) { toast('Min 4 characters'); return; } const rr = await api('/api/admin/setpass', { pass: p }); if (rr.ok) { toast('Admin password saved ✓'); vSettings(); } else toast(rr.error === 'short' ? 'Min 4 characters' : 'Error'); });
     { const admdel = $('#s-admdel'); if (admdel) admdel.addEventListener('click', async () => { if (!confirm('Remove the admin panel password?')) return; const rr = await api('/api/admin/setpass', { pass: '' }); if (rr.ok) { toast('Password removed'); vSettings(); } else toast('Error'); }); }
