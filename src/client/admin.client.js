@@ -270,12 +270,21 @@
   const catRow = (c) => `<div class="fieldrow" data-cat><div class="grid2"><div class="field"><label>Category name</label><input data-cname value="${esc(tl(c.name))}" placeholder="e.g. Game Top-Up"></div><div class="field"><label>ID (english)</label><input data-ck value="${esc(c.id)}" placeholder="auto"></div></div></div>`;
 
   /* ---------- users ---------- */
+  let userFilter = '', allUsers = [];
   async function vUsers() {
     const c = $('#content'); c.innerHTML = '<div class="spin"></div>';
-    const r = await api('/api/admin/users'); const items = r.items || [];
-    c.innerHTML = `<div class="card"><table class="tbl"><thead><tr><th>Name</th><th>Phone</th><th>Balance</th><th>Role</th><th></th></tr></thead><tbody>
-      ${items.map((x) => `<tr><td><b>${esc(x.name)}</b> ${x.blocked ? '<span class="pill">blocked</span>' : ''}<div class="muted mono">${esc(x.ref)}</div></td><td class="mono">${x.email ? esc(x.email) : ''}${x.email && x.phone ? '<br>' : ''}${x.phone ? esc(x.phone) : ''}${!x.email && !x.phone ? '—' : ''}</td><td><b>${money(x.balance)}</b></td><td>${x.role === 'admin' ? '<span class="badge b-approved">admin</span>' : 'user'}</td>
-        <td><button class="btn btn-ghost btn-sm" data-user='${esc(JSON.stringify(x))}'>${icon('edit')}Manage</button></td></tr>`).join('')}
+    const r = await api('/api/admin/users'); allUsers = r.items || [];
+    renderUsers();
+  }
+  function renderUsers() {
+    const match = (x) => userFilter === 'admin' ? x.role === 'admin' : userFilter === 'blocked' ? x.blocked : userFilter === 'user' ? (x.role !== 'admin' && !x.blocked) : true;
+    const cnt = (k) => allUsers.filter((x) => k === 'admin' ? x.role === 'admin' : k === 'blocked' ? x.blocked : k === 'user' ? (x.role !== 'admin' && !x.blocked) : true).length;
+    const items = allUsers.filter(match);
+    const tabs = [['', 'All'], ['user', 'Users'], ['admin', 'Admins'], ['blocked', 'Blocked']];
+    $('#content').innerHTML = `<div class="tabs">${tabs.map(([k, l]) => `<button data-uf="${k}" class="${userFilter === k ? 'on' : ''}">${l} <span class="count-i">${cnt(k)}</span></button>`).join('')}</div>
+      <div class="card"><table class="tbl"><thead><tr><th>Name</th><th>Email / Phone</th><th>Balance</th><th>Role</th><th></th></tr></thead><tbody>
+      ${items.length ? items.map((x) => `<tr><td><b>${esc(x.name)}</b> ${x.blocked ? '<span class="pill">blocked</span>' : ''}<div class="muted mono">${esc(x.ref)}</div></td><td class="mono">${x.email ? esc(x.email) : ''}${x.email && x.phone ? '<br>' : ''}${x.phone ? esc(x.phone) : ''}${!x.email && !x.phone ? '—' : ''}</td><td><b>${money(x.balance)}</b></td><td>${x.role === 'admin' ? '<span class="badge b-approved">admin</span>' : 'user'}</td>
+        <td><button class="btn btn-ghost btn-sm" data-user='${esc(JSON.stringify(x))}'>${icon('edit')}Manage</button></td></tr>`).join('') : '<tr><td colspan="5" class="muted" style="padding:20px;text-align:center">No users</td></tr>'}
     </tbody></table></div>`;
   }
   function userModal(x) {
@@ -537,6 +546,7 @@
     if (e.target.closest('[data-close]') || (e.target.classList && e.target.classList.contains('scrim'))) { closeModal(); return; }
     const of = e.target.closest('[data-of]'); if (of) { orderFilter = of.dataset.of; vOrders(); return; }
     const df = e.target.closest('[data-df]'); if (df) { depFilter = df.dataset.df; vDeposits(); return; }
+    const uf = e.target.closest('[data-uf]'); if (uf) { userFilter = uf.dataset.uf; renderUsers(); return; }
     const ov = e.target.closest('[data-oview]'); if (ov) { try { orderModal(JSON.parse(ov.dataset.oview)); } catch (x) {} return; }
     const dok = e.target.closest('[data-dep-ok]'); if (dok) { if (confirm('Approve this deposit and add balance?')) { const r = await api('/api/admin/deposit', { key: dok.dataset.depOk, status: 'approved' }); if (r.ok) { toast('Approved'); vDeposits(); loadCounts(); } } return; }
     const dno = e.target.closest('[data-dep-no]'); if (dno) { if (confirm('Reject this deposit?')) { const r = await api('/api/admin/deposit', { key: dno.dataset.depNo, status: 'rejected' }); if (r.ok) { toast('Rejected'); vDeposits(); loadCounts(); } } return; }
