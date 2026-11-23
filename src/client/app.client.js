@@ -31,7 +31,7 @@
   const T = {
     dashboard: { bn: 'ড্যাশবোর্ড', en: 'Dashboard' }, addMoney: { bn: 'অ্যাড মানি', en: 'Add Money' }, recharge: { bn: 'রিচার্জ', en: 'Recharge' },
     orders: { bn: 'অর্ডার', en: 'Orders' }, referrals: { bn: 'রেফারেল', en: 'Referrals' }, profile: { bn: 'প্রোফাইল', en: 'Profile' },
-    transactions: { bn: 'লেনদেন', en: 'Transactions' }, allCats: { bn: 'সব', en: 'All' }, txnHistory: { bn: 'ট্রানজেকশন হিস্টোরি', en: 'Transaction history' },
+    transactions: { bn: 'লেনদেন', en: 'Transactions' }, allCats: { bn: 'সব', en: 'All' }, txnHistory: { bn: 'ট্রানজেকশন হিস্টোরি', en: 'Transaction history' }, rules: { bn: 'নিয়ম ও শর্তাবলী', en: 'Rules & Regulations' },
     home: { bn: 'হোম', en: 'Home' }, services: { bn: 'সার্ভিস', en: 'Services' }, balance: { bn: 'ব্যালেন্স', en: 'Balance' },
     walletBalance: { bn: 'ওয়ালেট ব্যালেন্স', en: 'Wallet Balance' }, quickServices: { bn: 'কুইক সার্ভিস', en: 'Quick Services' },
     priceList: { bn: 'মূল্য তালিকা', en: 'Price List' }, recentOrders: { bn: 'সাম্প্রতিক অর্ডার', en: 'Recent Orders' },
@@ -211,23 +211,30 @@
       ? `${catTabs}<div class="qgrid">${shown.length ? shown.map(qsCard).join('') : emptyBox(u('services'))}</div>`
       : `<div class="sec-h">${icon('bolt')}${u('quickServices')}</div><div class="qgrid">${emptyBox(u('services'))}</div>`;
     const B = S.settings || {};
+    const en = S.lang === 'en';
     const banners = (B.banners || []).filter((b) => b && b.img);
-    const bannerHtml = L('home', 'hero') && banners.length ? `<div class="promo">
-        <div class="promo-track">${banners.map((b) => `<div class="promo-slide"${b.link ? ` data-nav="${esc(b.link)}" role="button"` : ''}><img src="${esc(b.img)}" alt="" loading="eager"></div>`).join('')}</div>
-        ${banners.length > 1 ? `<div class="promo-dots">${banners.map((_, i) => `<i${i === 0 ? ' class="on"' : ''}></i>`).join('')}</div>` : ''}
-      </div>` : '';
+    // single notice, shown as a strip overlaid on the banner picture
+    const n1 = (L('home', 'notices') && S.notices.length) ? S.notices[0] : null;
+    const noticeBar = n1 ? `<div class="promo-notice ${n1.type === 'urgent' ? 'urgent' : ''}">${icon(n1.type === 'urgent' ? 'alert' : 'bell')}<div class="pn-marq"><span>${esc(t(n1.title))}${t(n1.body) ? ' — ' + esc(t(n1.body)) : ''}</span></div></div>` : '';
+    const bannerHtml = L('home', 'hero') && banners.length
+      ? `<div class="promo">
+          <div class="promo-track">${banners.map((b) => `<div class="promo-slide"${b.link ? ` data-nav="${esc(b.link)}" role="button"` : ''}><img src="${esc(b.img)}" alt="" loading="eager"></div>`).join('')}</div>
+          ${banners.length > 1 ? `<div class="promo-dots">${banners.map((_, i) => `<i${i === 0 ? ' class="on"' : ''}></i>`).join('')}</div>` : ''}
+          ${noticeBar}
+        </div>`
+      : (n1 ? `<div class="promo promo-bar">${noticeBar}</div>` : '');
+    const foot = `<div class="home-foot">
+      <div class="hf-top">${B.logo ? `<img class="hf-logo" src="${esc(B.logo)}" alt="">` : `<span class="logo-mark">${icon('bolt')}</span>`}<div class="hf-brand"><b>${esc(B.brandA || '')} ${esc(B.brandB || '')}</b><small>${esc(t(B.tagline))}</small></div></div>
+      ${B.rules ? `<div class="hf-rules"><div class="hf-rules-h">${icon('info')}${u('rules')}</div><div class="hf-rules-b">${esc(B.rules)}</div></div>` : ''}
+      <div class="hf-copy">© ${new Date().getFullYear()} ${esc(B.brandA || '')} ${esc(B.brandB || '')}</div></div>`;
     v.innerHTML = `
       ${bannerHtml}
-      ${L('home', 'notices') && S.notices.length ? `<div class="sec-h">${icon('bell')}${u('noticeBoard')}</div>
-      <div>${S.notices.map((n) => `<div class="notice ${n.type === 'urgent' ? 'urgent' : ''}">
-        <div class="notice-h">${icon(n.type === 'urgent' ? 'alert' : 'info')}<span>${esc(t(n.title))}</span></div>
-        <div class="notice-b">${esc(t(n.body))}</div></div>`).join('')}</div>` : ''}
-
       ${L('home', 'products') ? catSections : ''}
 
       ${L('home', 'recent') ? `<div class="sec-h">${icon('clock')}${u('recentOrders')}<span class="live-dot"><i></i>LIVE</span></div>
       <div class="card">${S.live.length ? S.live.map(liveRow).join('') : emptyBox(u('noOrders'))}</div>` : ''}
 
+      ${foot}
       <div style="height:10px"></div>`;
     $$('.cat-tab').forEach((b) => b.addEventListener('click', () => { S.homeCat = b.dataset.cat; viewHome(v); }));
     if (banners.length > 1) initPromo(v);

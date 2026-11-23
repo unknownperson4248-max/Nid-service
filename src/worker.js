@@ -296,7 +296,7 @@ function pubMethods(list) {
 const pubBanners = (list) => (Array.isArray(list) ? list : []).map((b) => ({ img: safeImg(b && b.img), link: clip((b && b.link) || '', 120) })).filter((b) => b.img).slice(0, 8);
 const pubSettings = (s) => ({ heroTitle: s.heroTitle, heroSub: s.heroSub, heroImg: safeImg(s.heroImg), banners: pubBanners(s.banners), texts: cleanTexts(s.texts), layout: cleanLayout(s.layout), brandA: s.brandA, brandB: s.brandB, logo: safeImg(s.logo), themeColor: safeHex(s.themeColor), tagline: s.tagline, currency: s.currency, minDeposit: s.minDeposit,
   depositMethods: pubMethods(s.depositMethods), referralBonus: s.referralBonus, whatsapp: s.whatsapp,
-  googleOn: !!(s.googleOn && s.googleCID && s.googleSecret) });
+  googleOn: !!(s.googleOn && s.googleCID && s.googleSecret), rules: s.rules || '' });
 async function bumpStat(env, k) { const key = 'stat:' + k; const n = +((await env.DATA.get(key)) || 0); await env.DATA.put(key, String(n + 1)); }
 
 /* ---------------- admin APIs ---------------- */
@@ -521,6 +521,7 @@ async function handleAdmin(req, env, url, path, u) {
       next.themeColor = safeHex(next.themeColor); next.logo = safeImg(next.logo);
       next.texts = cleanTexts(next.texts); next.layout = cleanLayout(next.layout);
       next.seoTitle = clip(next.seoTitle, 90); next.seoDesc = clip(next.seoDesc, 300);
+      next.rules = String(next.rules || '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').slice(0, 4000);
       next.heroTitle = clip(next.heroTitle, 80); next.heroSub = clip(next.heroSub, 160); next.heroImg = safeImg(next.heroImg);
       if (Array.isArray(next.banners)) next.banners = next.banners.slice(0, 8).map((b) => ({ img: safeImg(b && b.img), link: clip((b && b.link) || '', 120) })).filter((b) => b.img);
       next.adminPass = cur.adminPass || null; // only changed via /api/admin/setpass, never the generic save
@@ -589,16 +590,24 @@ async function renderShellHtml(env, url) {
   const theme = safeHex(s.themeColor), logo = safeImg(s.logo);
   const title = escHtml(String(s.seoTitle || `${s.brandA} ${s.brandB}`).slice(0, 90));
   const desc = escHtml(String(s.seoDesc || '').slice(0, 300));
+  const siteName = escHtml(`${s.brandA || ''} ${s.brandB || ''}`.trim());
+  const img = logo ? escHtml(url.origin + logo) : '';
   const head = [
     `<title>${title}</title>`,
     `<meta name="description" content="${desc}">`,
     `<meta name="theme-color" content="${theme}">`,
     `<meta property="og:type" content="website">`,
+    `<meta property="og:site_name" content="${siteName}">`,
     `<meta property="og:title" content="${title}">`,
     `<meta property="og:description" content="${desc}">`,
     `<meta property="og:url" content="${escHtml(url.origin + '/')}">`,
-    logo ? `<meta property="og:image" content="${escHtml(url.origin + logo)}">` : '',
+    img ? `<meta property="og:image" content="${img}">` : '',
+    `<meta name="twitter:card" content="${img ? 'summary_large_image' : 'summary'}">`,
+    `<meta name="twitter:title" content="${title}">`,
+    `<meta name="twitter:description" content="${desc}">`,
+    img ? `<meta name="twitter:image" content="${img}">` : '',
     logo ? `<link rel="icon" href="${logo}">` : '',
+    logo ? `<link rel="apple-touch-icon" href="${logo}">` : '',
     `<link rel="canonical" href="${escHtml(url.origin + '/')}">`,
     `<style>:root{--brand:${theme};--brand2:${shade(theme, 0.28)};--brand-d:${shade(theme, -0.25)}}</style>`,
   ].filter(Boolean).join('\n');

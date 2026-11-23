@@ -381,6 +381,10 @@
       <div class="field"><label>Google Client Secret ${r.googleSecretSet ? '<span style="color:#16a34a">(saved — blank = keep)</span>' : ''}</label><input id="s-gsec" type="password" autocomplete="new-password" maxlength="200" placeholder="${r.googleSecretSet ? '••••••••' : 'GOCSPX-...'}"></div>
       <div class="muted" style="font-size:12px">Create a Web OAuth client in <b>Google Cloud → Credentials</b>. Set the <b>Authorized redirect URI</b> to:<br><code style="user-select:all;word-break:break-all">${esc(location.origin)}/auth/google/callback</code><br>and <b>Authorized JavaScript origin</b> to <code>${esc(location.origin)}</code>. Then paste Client ID + Secret above and Save.</div>
     </div></div>
+    <div class="card" style="margin-top:16px"><div class="card-h">${icon('edit')}Rules & Regulations (dashboard footer)</div><div class="card-b">
+      <div class="field"><textarea id="s-rules" rows="6" maxlength="4000" placeholder="Write your rules / terms — shown at the bottom of the home page">${esc(s.rules || '')}</textarea></div>
+      <div class="muted" style="font-size:12px">Appears at the bottom of the home dashboard, next to your brand logo. Leave blank to hide.</div>
+    </div></div>
     <div style="margin-top:16px"><button class="btn btn-ok" id="s-save">${icon('check')}Save settings</button></div>`;
     $('#s-save').addEventListener('click', saveSettings);
     $('#s-admset').addEventListener('click', async () => { const p = $('#s-admpass').value; if (p.length < 4) { toast('Min 4 characters'); return; } const rr = await api('/api/admin/setpass', { pass: p }); if (rr.ok) { toast('Admin password saved ✓'); vSettings(); } else toast(rr.error === 'short' ? 'Min 4 characters' : 'Error'); });
@@ -423,6 +427,7 @@
   async function saveSettings() {
     const settings = { banners: S.banners || [], seoTitle: $('#s-seot').value.trim(), seoDesc: $('#s-seod').value.trim(), logo: S.logo || '', themeColor: $('#s-theme').value, brandA: $('#s-a').value.trim(), brandB: $('#s-b').value.trim(), tagline: $('#s-tbn').value.trim(), currency: $('#s-cur').value.trim() || '৳', minDeposit: Number($('#s-min').value) || 20, referralBonus: Number($('#s-ref').value) || 0, whatsapp: $('#s-wa').value.replace(/[^0-9]/g, ''), googleOn: $('#s-gon') ? $('#s-gon').checked : false, googleCID: $('#s-gcid') ? $('#s-gcid').value.trim() : '' };
     { const gsec = $('#s-gsec') ? $('#s-gsec').value : ''; if (gsec) settings.googleSecret = gsec; }
+    if ($('#s-rules')) settings.rules = $('#s-rules').value;
     const r = await api('/api/admin/settings', { settings }); if (r.ok) toast('Saved ✓'); else toast('Error');
   }
 
