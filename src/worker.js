@@ -296,7 +296,8 @@ function pubMethods(list) {
 const pubBanners = (list) => (Array.isArray(list) ? list : []).map((b) => ({ img: safeImg(b && b.img), link: clip((b && b.link) || '', 120) })).filter((b) => b.img).slice(0, 8);
 const pubSettings = (s) => ({ heroTitle: s.heroTitle, heroSub: s.heroSub, heroImg: safeImg(s.heroImg), banners: pubBanners(s.banners), texts: cleanTexts(s.texts), layout: cleanLayout(s.layout), brandA: s.brandA, brandB: s.brandB, logo: safeImg(s.logo), themeColor: safeHex(s.themeColor), tagline: s.tagline, currency: s.currency, minDeposit: s.minDeposit,
   depositMethods: pubMethods(s.depositMethods), referralBonus: s.referralBonus, whatsapp: s.whatsapp,
-  googleOn: !!(s.googleOn && s.googleCID && s.googleSecret), rules: s.rules || '' });
+  googleOn: !!(s.googleOn && s.googleCID && s.googleSecret), rules: s.rules || '',
+  telegram: s.telegram || '', telegramCh: s.telegramCh || '', footerAbout: s.footerAbout || '', privacy: s.privacy || '', poweredBy: s.poweredBy || '' });
 async function bumpStat(env, k) { const key = 'stat:' + k; const n = +((await env.DATA.get(key)) || 0); await env.DATA.put(key, String(n + 1)); }
 
 /* ---------------- admin APIs ---------------- */
@@ -522,6 +523,9 @@ async function handleAdmin(req, env, url, path, u) {
       next.texts = cleanTexts(next.texts); next.layout = cleanLayout(next.layout);
       next.seoTitle = clip(next.seoTitle, 90); next.seoDesc = clip(next.seoDesc, 300);
       next.rules = String(next.rules || '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').slice(0, 4000);
+      next.privacy = String(next.privacy || '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').slice(0, 4000);
+      next.footerAbout = String(next.footerAbout || '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').slice(0, 600);
+      next.telegram = clip(next.telegram, 120); next.telegramCh = clip(next.telegramCh, 120); next.poweredBy = clip(next.poweredBy, 60);
       next.heroTitle = clip(next.heroTitle, 80); next.heroSub = clip(next.heroSub, 160); next.heroImg = safeImg(next.heroImg);
       if (Array.isArray(next.banners)) next.banners = next.banners.slice(0, 8).map((b) => ({ img: safeImg(b && b.img), link: clip((b && b.link) || '', 120) })).filter((b) => b.img);
       next.adminPass = cur.adminPass || null; // only changed via /api/admin/setpass, never the generic save

@@ -381,7 +381,17 @@
       <div class="field"><label>Google Client Secret ${r.googleSecretSet ? '<span style="color:#16a34a">(saved — blank = keep)</span>' : ''}</label><input id="s-gsec" type="password" autocomplete="new-password" maxlength="200" placeholder="${r.googleSecretSet ? '••••••••' : 'GOCSPX-...'}"></div>
       <div class="muted" style="font-size:12px">Create a Web OAuth client in <b>Google Cloud → Credentials</b>. Set the <b>Authorized redirect URI</b> to:<br><code style="user-select:all;word-break:break-all">${esc(location.origin)}/auth/google/callback</code><br>and <b>Authorized JavaScript origin</b> to <code>${esc(location.origin)}</code>. Then paste Client ID + Secret above and Save.</div>
     </div></div>
-    <div class="card" style="margin-top:16px"><div class="card-h">${icon('edit')}Rules & Regulations (dashboard footer)</div><div class="card-b">
+    <div class="card" style="margin-top:16px"><div class="card-h">${icon('home')}Footer & contact</div><div class="card-b">
+      <div class="grid2">
+        <div class="field"><label>Telegram (username or link)</label><input id="s-tg" maxlength="120" value="${esc(s.telegram || '')}" placeholder="@username or https://t.me/.."></div>
+        <div class="field"><label>Telegram channel link</label><input id="s-tgc" maxlength="120" value="${esc(s.telegramCh || '')}" placeholder="https://t.me/yourchannel"></div>
+        <div class="field"><label>Powered by (your name)</label><input id="s-pw" maxlength="60" value="${esc(s.poweredBy || '')}" placeholder="Rahat Wize"></div><div></div>
+      </div>
+      <div class="field"><label>Footer about (short brand line)</label><textarea id="s-fa" rows="3" maxlength="600" placeholder="e.g. Instant Free Fire top-up with AI bot, 24/7 service">${esc(s.footerAbout || '')}</textarea></div>
+      <div class="field"><label>Privacy Policy</label><textarea id="s-priv" rows="5" maxlength="4000" placeholder="Shown as a link in the footer (leave blank to hide)">${esc(s.privacy || '')}</textarea></div>
+      <div class="muted" style="font-size:12px">WhatsApp & contact buttons use the WhatsApp number from the General card below.</div>
+    </div></div>
+    <div class="card" style="margin-top:16px"><div class="card-h">${icon('edit')}Rules &amp; Regulations (Terms &amp; Conditions)</div><div class="card-b">
       <div class="field"><textarea id="s-rules" rows="6" maxlength="4000" placeholder="Write your rules / terms — shown at the bottom of the home page">${esc(s.rules || '')}</textarea></div>
       <div class="muted" style="font-size:12px">Appears at the bottom of the home dashboard, next to your brand logo. Leave blank to hide.</div>
     </div></div>
@@ -428,6 +438,11 @@
     const settings = { banners: S.banners || [], seoTitle: $('#s-seot').value.trim(), seoDesc: $('#s-seod').value.trim(), logo: S.logo || '', themeColor: $('#s-theme').value, brandA: $('#s-a').value.trim(), brandB: $('#s-b').value.trim(), tagline: $('#s-tbn').value.trim(), currency: $('#s-cur').value.trim() || '৳', minDeposit: Number($('#s-min').value) || 20, referralBonus: Number($('#s-ref').value) || 0, whatsapp: $('#s-wa').value.replace(/[^0-9]/g, ''), googleOn: $('#s-gon') ? $('#s-gon').checked : false, googleCID: $('#s-gcid') ? $('#s-gcid').value.trim() : '' };
     { const gsec = $('#s-gsec') ? $('#s-gsec').value : ''; if (gsec) settings.googleSecret = gsec; }
     if ($('#s-rules')) settings.rules = $('#s-rules').value;
+    if ($('#s-tg')) settings.telegram = $('#s-tg').value.trim();
+    if ($('#s-tgc')) settings.telegramCh = $('#s-tgc').value.trim();
+    if ($('#s-pw')) settings.poweredBy = $('#s-pw').value.trim();
+    if ($('#s-fa')) settings.footerAbout = $('#s-fa').value;
+    if ($('#s-priv')) settings.privacy = $('#s-priv').value;
     const r = await api('/api/admin/settings', { settings }); if (r.ok) toast('Saved ✓'); else toast('Error');
   }
 

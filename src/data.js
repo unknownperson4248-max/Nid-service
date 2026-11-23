@@ -14,7 +14,12 @@ export const DEFAULT_SETTINGS = {
   banners: [], // promo banner images shown at the top of home: [{ img:'/img/..', link:'' }]
   adminPass: null, // optional extra password to open the admin panel: { salt, iter, hash }
   googleOn: false, googleCID: '', googleSecret: '', // "Sign in with Google" (OAuth); set from admin
-  rules: 'অর্ডার করার আগে সঠিক তথ্য দিন। ভুল তথ্যের দায় কোম্পানি নেবে না। পেমেন্ট সফল হলে ডেলিভারি নিশ্চিত। যেকোনো সমস্যায় সাপোর্টে যোগাযোগ করুন।', // shown in the dashboard footer
+  rules: 'অর্ডার করার আগে সঠিক তথ্য দিন। ভুল তথ্যের দায় কোম্পানি নেবে না। পেমেন্ট সফল হলে ডেলিভারি নিশ্চিত। যেকোনো সমস্যায় সাপোর্টে যোগাযোগ করুন।', // Terms & Conditions in footer
+  telegram: '', // username or t.me link
+  telegramCh: '', // telegram channel link
+  footerAbout: '', // short brand description shown in the footer
+  privacy: '', // Privacy Policy text (footer)
+  poweredBy: 'Rahat Wize', // "Powered by ..." line in the footer
   tagline: { bn: 'দ্রুত • নিরাপদ • বিশ্বস্ত', en: 'Fast • Safe • Reliable' },
   currency: '৳',
   referralBonus: 10, // credited to referrer when a referred user's first deposit is approved

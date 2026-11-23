@@ -6,6 +6,8 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   const ICONS = {
+    telegram: '<path d="M22 3L2 10.5l6 2.2L18 6l-7.5 8.5.3 5 3-3.5 4.2 3z" fill="currentColor" stroke="none"/>',
+    megaphone: '<path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M14 7a5 5 0 0 1 0 10M16 4a9 9 0 0 1 0 16"/>',
     google: '<path fill="#4285F4" stroke="none" d="M21.6 12.23c0-.68-.06-1.33-.17-1.96H12v3.71h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.23c1.89-1.74 2.99-4.3 2.99-7.28z"/><path fill="#34A853" stroke="none" d="M12 22c2.7 0 4.96-.9 6.62-2.42l-3.23-2.51c-.9.6-2.04.96-3.39.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.59A10 10 0 0 0 12 22z"/><path fill="#FBBC05" stroke="none" d="M6.41 13.91a6 6 0 0 1 0-3.82V7.5H3.07a10 10 0 0 0 0 9z"/><path fill="#EA4335" stroke="none" d="M12 5.97c1.47 0 2.79.5 3.83 1.5l2.86-2.86A10 10 0 0 0 12 2a10 10 0 0 0-8.93 5.5l3.34 2.59C7.2 7.73 9.4 5.97 12 5.97z"/>',
     menu: '<path d="M3 6h18M3 12h18M3 18h18"/>', wallet: '<path d="M3 7h15a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l12-3v3"/><circle cx="16.5" cy="12.5" r="1.3" fill="currentColor" stroke="none"/>',
     bell: '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
@@ -223,10 +225,26 @@
           ${noticeBar}
         </div>`
       : (n1 ? `<div class="promo promo-bar">${noticeBar}</div>` : '');
+    const waN = (B.whatsapp || '').replace(/[^0-9]/g, '');
+    const tgLink = (vv) => { vv = String(vv || '').trim(); if (!vv) return ''; return /^https?:\/\//i.test(vv) ? vv : 'https://t.me/' + vv.replace(/^@/, ''); };
+    const tg = tgLink(B.telegram), tgc = tgLink(B.telegramCh);
+    const chBtn = (cls, href, ic, label) => href ? `<a class="ch-btn ${cls}" href="${esc(href)}" target="_blank" rel="noopener">${icon(ic)}<span>${label}</span></a>` : '';
+    const brand = `${esc(B.brandA || '')} ${esc(B.brandB || '')}`.trim();
     const foot = `<div class="home-foot">
-      <div class="hf-top">${B.logo ? `<img class="hf-logo" src="${esc(B.logo)}" alt="">` : `<span class="logo-mark">${icon('bolt')}</span>`}<div class="hf-brand"><b>${esc(B.brandA || '')} ${esc(B.brandB || '')}</b><small>${esc(t(B.tagline))}</small></div></div>
-      ${B.rules ? `<div class="hf-rules"><div class="hf-rules-h">${icon('info')}${u('rules')}</div><div class="hf-rules-b">${esc(B.rules)}</div></div>` : ''}
-      <div class="hf-copy">© ${new Date().getFullYear()} ${esc(B.brandA || '')} ${esc(B.brandB || '')}</div></div>`;
+      ${(waN || tg || tgc) ? `<div class="hf-contact">
+        <h3>${en ? 'Contact & support' : 'যোগাযোগ ও সাপোর্ট'}</h3>
+        <p>${en ? 'Choose a channel — we respond as soon as we can' : 'একটি চ্যানেল বেছে নিন — দ্রুত উত্তর দেওয়া হবে'}</p>
+        ${chBtn('wa', waN ? 'https://wa.me/' + waN : '', 'whatsapp', 'WhatsApp')}
+        ${chBtn('tg', tg, 'telegram', 'Telegram')}
+        ${chBtn('tg', tgc, 'megaphone', en ? 'Telegram channel' : 'টেলিগ্রাম চ্যানেল')}
+      </div>` : ''}
+      <div class="hf-brandrow">${B.logo ? `<img class="hf-logo" src="${esc(B.logo)}" alt="">` : `<span class="logo-mark">${icon('bolt')}</span>`}
+        <div class="hf-brand"><b>${brand}</b>${B.footerAbout ? `<p>${esc(B.footerAbout)}</p>` : `<small>${esc(t(B.tagline))}</small>`}${waN ? `<p class="hf-wa">WHATSAPP : ${esc(B.whatsapp)}</p>` : ''}</div></div>
+      <div class="hf-bottom">
+        <div class="hf-copy">© ${new Date().getFullYear()} ${brand}. ${en ? 'All rights reserved.' : 'সর্বস্বত্ব সংরক্ষিত।'}</div>
+        ${(B.rules || B.privacy) ? `<div class="hf-links">${B.rules ? `<a data-doc="terms">${en ? 'Terms & Conditions' : 'শর্তাবলী'}</a>` : ''}${B.privacy ? `<a data-doc="privacy">${en ? 'Privacy Policy' : 'প্রাইভেসি পলিসি'}</a>` : ''}</div>` : ''}
+        ${B.poweredBy ? `<div class="hf-power">Powered by <b>${esc(B.poweredBy)}</b></div>` : ''}
+      </div></div>`;
     v.innerHTML = `
       ${bannerHtml}
       ${L('home', 'products') ? catSections : ''}
@@ -537,6 +555,7 @@
       </div>` : ''}`);
   }
   function openSheet(html) { const s = document.createElement('div'); s.className = 'modal-scrim'; s.dataset.sheet = '1'; s.innerHTML = `<div class="sheet">${html}</div>`; document.body.appendChild(s); }
+  function docSheet(kind) { const en = S.lang === 'en'; const title = kind === 'privacy' ? (en ? 'Privacy Policy' : 'প্রাইভেসি পলিসি') : (en ? 'Terms & Conditions' : 'শর্তাবলী'); const body = kind === 'privacy' ? (S.settings.privacy || '') : (S.settings.rules || ''); openSheet(`<div class="sheet-h"><h3>${esc(title)}</h3><button class="x" data-sheet-close>${icon('x')}</button></div><div class="doc-body">${esc(body)}</div>`); }
 
   /* ---------- events ---------- */
   document.addEventListener('click', async (e) => {
@@ -550,6 +569,7 @@
     const cp = e.target.closest('[data-copy]'); if (cp) { navigator.clipboard && navigator.clipboard.writeText(cp.dataset.copy); toast(u('copied')); return; }
     const sh = e.target.closest('[data-share]'); if (sh) { if (navigator.share) navigator.share({ url: sh.dataset.share, title: S.settings.brandA + ' ' + S.settings.brandB }); else { navigator.clipboard && navigator.clipboard.writeText(sh.dataset.share); toast(u('copied')); } return; }
     const ord = e.target.closest('[data-order]'); if (ord) { try { orderSheet(JSON.parse(ord.dataset.order)); } catch (x) {} return; }
+    const doc = e.target.closest('[data-doc]'); if (doc) { e.preventDefault(); docSheet(doc.dataset.doc); return; }
     if (e.target.closest('[data-sheet-close]') || (e.target.classList && e.target.classList.contains('modal-scrim'))) { const m = document.querySelector('[data-sheet]'); if (m) m.remove(); return; }
   });
   document.addEventListener('submit', (e) => { if (e.target.id === 'auth-form') { e.preventDefault(); doAuth(e.target); } });
