@@ -209,7 +209,14 @@
         <div class="flex"><div id="f-imgprev" class="iconbox" style="width:54px;height:54px;background:#eef2f5;overflow:hidden">${s.image ? `<img src="${esc(s.image)}" style="width:100%;height:100%;object-fit:cover">` : icon('eye')}</div>
           <button type="button" class="btn btn-ghost btn-sm" id="f-imgbtn">${icon('plus')}Upload image</button>
           ${s.image ? `<button type="button" class="btn btn-bad btn-sm" id="f-imgdel">Remove</button>` : ''}</div>
-        <input type="file" id="f-imgfile" accept="image/*" style="display:none"><div class="muted" style="font-size:11px;margin-top:4px">Shows on the product box and page. Max 2MB.</div></div>
+        <input type="file" id="f-imgfile" accept="image/*" style="display:none"><div class="muted" style="font-size:11px;margin-top:4px">Shows on the product box only (not inside the order page). Max 2MB.</div></div>
+      <div class="field"><label>Order guide (shown in a box under the order form)</label>
+        <div class="flex"><div id="f-gimgprev" class="iconbox" style="width:54px;height:54px;background:#eef2f5;overflow:hidden">${s.guideImg ? `<img src="${esc(s.guideImg)}" style="width:100%;height:100%;object-fit:cover">` : icon('images')}</div>
+          <button type="button" class="btn btn-ghost btn-sm" id="f-gimgbtn">${icon('plus')}Guide image</button>
+          ${s.guideImg ? `<button type="button" class="btn btn-bad btn-sm" id="f-gimgdel">Remove</button>` : ''}</div>
+        <input type="file" id="f-gimgfile" accept="image/*" style="display:none">
+        <textarea id="f-gnote" rows="2" maxlength="500" placeholder="e.g. Clan ID koi pabe — chobi dekhun" style="margin-top:8px">${esc(s.guideNote || '')}</textarea>
+        <div class="muted" style="font-size:11px;margin-top:4px">A help box (image + text) shown below the order form, to guide buyers. Max 2MB.</div></div>
       <div class="grid2">
         <div class="field"><label>Category</label><select id="f-cat">${S.cats.map((c) => `<option value="${esc(c.id)}" ${s.cat === c.id ? 'selected' : ''}>${esc(tl(c.name))}</option>`).join('')}</select></div>
         <div class="field"><label>Icon (if no image)</label><select id="f-icon">${['bolt', 'diamond', 'crown', 'thumb', 'phone', 'wallet', 'box', 'grid', 'money', 'eye'].map((n) => `<option value="${n}" ${s.icon === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
@@ -250,7 +257,7 @@
       editing.fields = editing.fields || [];
       if (bb.dataset.apipreset === 'ffglory') {
         editing.api = { on: true, doneOnOk: true, method: 'POST', url: 'https://ffglory.pro/api/client/auto-clan-group', query: '{"api_key":"{{FFGLORY_KEY}}"}', headers: '{"x-api-key":"{{FFGLORY_MKEY}}"}', body: '{"region":"{region}","clan_id":"{clan_id}"}', idPath: 'group_id' };
-        if (!editing.fields.some((f) => f.key === 'region')) editing.fields.unshift({ key: 'region', type: 'select', required: true, label: { bn: 'রিজন নির্বাচন করুন', en: 'Region' }, options: [{ label: '🇧🇩 বাংলাদেশ', value: 'bd' }, { label: '🌍 Middle East', value: 'me' }] });
+        if (!editing.fields.some((f) => f.key === 'region')) editing.fields.unshift({ key: 'region', type: 'select', required: true, label: { bn: 'রিজন নির্বাচন করুন', en: 'Region' }, options: [{ label: '🇧🇩 বাংলাদেশ', value: 'bd' }] });
         if (!editing.fields.some((f) => f.key === 'duration')) { const ri = editing.fields.findIndex((f) => f.key === 'region'); editing.fields.splice(ri + 1, 0, { key: 'duration', type: 'select', required: true, label: { bn: 'সময়কাল', en: 'Duration' }, options: [{ label: '৮ ঘণ্টা', value: '8h', price: 0, note: '8 hours · 1 credit' }, { label: '১৬ ঘণ্টা', value: '16h', note: '+8 hours · 2 credits' }] }); }
         if (!editing.fields.some((f) => f.key === 'clan_id')) editing.fields.push({ key: 'clan_id', type: 'text', required: true, label: { bn: 'ক্লান আইডি (UID)', en: 'Clan ID' }, ph: '123456789' });
         toast('ffglory ready ✓ region + Clan ID boxes added');
@@ -265,8 +272,11 @@
     $('#f-imgbtn').addEventListener('click', () => $('#f-imgfile').click());
     $('#f-imgfile').addEventListener('change', uploadImage);
     const del = $('#f-imgdel'); if (del) del.addEventListener('click', () => { readFieldsFromDom(); syncSvcText(); editing.image = ''; svcModal(); });
+    $('#f-gimgbtn').addEventListener('click', () => $('#f-gimgfile').click());
+    $('#f-gimgfile').addEventListener('change', uploadGuideImage);
+    const gdel = $('#f-gimgdel'); if (gdel) gdel.addEventListener('click', () => { readFieldsFromDom(); syncSvcText(); editing.guideImg = ''; svcModal(); });
   }
-  function syncSvcText() { const g = (id) => { const el = $(id); return el ? el.value : undefined; }; const n = g('#f-name'); if (n !== undefined) editing.name = n.trim(); const sb = g('#f-sub'); if (sb !== undefined) editing.sub = sb.trim(); const no = g('#f-note'); if (no !== undefined) editing.note = no.trim(); const cat = g('#f-cat'); if (cat !== undefined) editing.cat = cat; const ic = g('#f-icon'); if (ic !== undefined) editing.icon = ic; const col = g('#f-color'); if (col !== undefined) editing.color = col; const pr = g('#f-price'); if (pr !== undefined) editing.price = Number(pr) || 0; const ac = $('#f-active'); if (ac) editing.active = ac.checked; const fe = $('#f-featured'); if (fe) editing.featured = fe.checked;
+  function syncSvcText() { const g = (id) => { const el = $(id); return el ? el.value : undefined; }; const n = g('#f-name'); if (n !== undefined) editing.name = n.trim(); const sb = g('#f-sub'); if (sb !== undefined) editing.sub = sb.trim(); const no = g('#f-note'); if (no !== undefined) editing.note = no.trim(); const cat = g('#f-cat'); if (cat !== undefined) editing.cat = cat; const ic = g('#f-icon'); if (ic !== undefined) editing.icon = ic; const col = g('#f-color'); if (col !== undefined) editing.color = col; const pr = g('#f-price'); if (pr !== undefined) editing.price = Number(pr) || 0; const ac = $('#f-active'); if (ac) editing.active = ac.checked; const fe = $('#f-featured'); if (fe) editing.featured = fe.checked; const gn = $('#f-gnote'); if (gn) editing.guideNote = gn.value.trim();
     const ao = $('#f-api-on'); if (ao) { editing.api = editing.api || {}; editing.api.on = ao.checked; editing.api.doneOnOk = $('#f-api-done') ? $('#f-api-done').checked : !!editing.api.doneOnOk; editing.api.method = (g('#f-api-method') || 'POST'); editing.api.url = (g('#f-api-url') || '').trim(); editing.api.query = (g('#f-api-query') || '').trim(); editing.api.headers = (g('#f-api-headers') || '').trim(); editing.api.body = (g('#f-api-body') || '').trim(); editing.api.idPath = (g('#f-api-idpath') || '').trim(); } }
   async function uploadImage(e) {
     const file = e.target.files[0]; if (!file) return;
@@ -276,6 +286,15 @@
     toast('Uploading...');
     const r = await api('/api/admin/upload', { dataUrl });
     if (r.ok) { editing.image = r.path; svcModal(); } else toast('Upload failed');
+  }
+  async function uploadGuideImage(e) {
+    const file = e.target.files[0]; if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast('Image too big (max 2MB)'); return; }
+    readFieldsFromDom(); syncSvcText();
+    const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
+    toast('Uploading...');
+    const r = await api('/api/admin/upload', { dataUrl });
+    if (r.ok) { editing.guideImg = r.path; svcModal(); } else toast('Upload failed');
   }
   function fieldEditor(f, i) {
     return `<div class="fieldrow" data-fi="${i}">

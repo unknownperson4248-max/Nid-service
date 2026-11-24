@@ -323,17 +323,17 @@
     if (!s) { v.innerHTML = emptyBox(u('services')); return; }
     v.innerHTML = `
       <div class="ph"><button class="back" data-back>${icon('left')}</button><div><h2>${esc(t(s.name))}</h2><div class="sub">${esc(t(s.sub))}</div></div></div>
-      ${s.image ? `<div class="svc-banner"><img src="${esc(s.image)}" alt="${esc(t(s.name))}"></div>` : ''}
       <div class="svc-hero" style="background:linear-gradient(135deg,${svcColor(s)},${svcColor(s)}cc)">
-        <span class="qs-ic">${icon(s.icon || 'bolt')}</span><span class="svc-hero-t"><b>${esc(t(s.name))}</b><br><small>${esc(t(s.sub))}</small></span>
-        <span class="svc-price">${svcHasVariable(s) ? `<small>${u('from')}</small>` : ''}${money(svcMinPrice(s))}</span></div>
+        <span class="qs-ic">${icon(s.icon || 'bolt')}</span><span class="svc-hero-t"><b>${esc(t(s.name))}</b><br><small>${esc(t(s.sub))}</small></span></div>
       ${t(s.note) ? `<div class="notice"><div class="notice-h">${icon('info')}<span>${u('details')}</span></div><div class="notice-b">${esc(t(s.note))}</div></div>` : ''}
       <div id="ord-err"></div>
       <form id="svc-form" class="card card-pad">
         ${(s.fields || []).map(fieldHtml).join('')}
         <div class="total-box"><span class="t">${u('total')}</span><span class="v" id="ord-total">${money(0)}</span></div>
         <button class="btn" type="submit">${icon('check')}${u('orderNow')}</button>
-      </form><div style="height:10px"></div>`;
+      </form>
+      ${(s.guideImg || s.guideNote) ? `<div class="guide-box"><div class="guide-h">${icon('info')}<span>${S.lang === 'en' ? 'How to order' : 'কিভাবে অর্ডার করবেন'}</span></div>${s.guideImg ? `<a href="${esc(s.guideImg)}" target="_blank" rel="noopener"><img class="guide-img" src="${esc(s.guideImg)}" alt=""></a>` : ''}${s.guideNote ? `<div class="guide-note">${esc(s.guideNote)}</div>` : ''}</div>` : ''}
+      <div style="height:10px"></div>`;
     const form = $('#svc-form');
     const recalc = () => { $('#ord-total').textContent = money(calcPrice(s, formVals(form))); };
     form.addEventListener('input', recalc); form.addEventListener('change', recalc); recalc();
