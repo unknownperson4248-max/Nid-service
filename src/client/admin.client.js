@@ -42,11 +42,16 @@
   }
   function renderNoAdmin() { root.innerHTML = `<div class="login"><div class="login-card" style="text-align:center"><div class="mark">${icon('lock')}</div><h2>Not an admin</h2><p>This account has no admin access.</p><a class="btn" href="/">Go to app</a></div></div>`; }
 
-  const NAV = [['dash', 'dash', 'Dashboard'], ['orders', 'box', 'Orders'], ['deposits', 'wallet', 'Deposits'], ['payments', 'money', 'Payment Methods'], ['services', 'grid', 'Services'], ['users', 'users', 'Users'], ['notices', 'bell', 'Notices'], ['texts', 'edit', 'Texts'], ['layout', 'grid', 'Layout'], ['settings', 'cog', 'Settings']];
+  const NAV = [
+    ['Overview', [['dash', 'dash', 'Dashboard']]],
+    ['Shop', [['orders', 'box', 'Orders'], ['deposits', 'wallet', 'Deposits'], ['services', 'grid', 'Products'], ['payments', 'money', 'Payment methods']]],
+    ['Customers', [['users', 'users', 'Users'], ['notices', 'bell', 'Notices']]],
+    ['Site & settings', [['texts', 'edit', 'Texts'], ['layout', 'grid', 'Layout'], ['settings', 'cog', 'Settings']]],
+  ];
   function renderShell() {
     root.innerHTML = `<div class="wrap">
       <aside class="side ${S.menuOpen ? 'on' : ''}"><div class="brand"><span class="mark">${icon('bolt')}</span><b>WizeFF Admin</b></div>
-        <nav>${NAV.map(([k, ic, l]) => `<button data-tab="${k}" class="${S.tab === k ? 'on' : ''}">${icon(ic)}<span>${l}</span><span class="count ${k}-count" style="display:none"></span></button>`).join('')}</nav>
+        <nav>${NAV.map(([group, items]) => `<div class="nav-group">${esc(group)}</div>${items.map(([k, ic, l]) => `<button data-tab="${k}" class="${S.tab === k ? 'on' : ''}">${icon(ic)}<span>${l}</span><span class="count ${k}-count" style="display:none"></span></button>`).join('')}`).join('')}</nav>
         <div class="foot"><a href="/">${icon('eye')}View site</a><button data-act="logout">${icon('logout')}Logout</button></div></aside>
       <div class="side-scrim ${S.menuOpen ? 'on' : ''}" data-act="menu-close"></div>
       <main class="main"><div class="topbar"><button class="menu-btn" data-act="menu">${icon('menu')}</button><h1 id="title">Dashboard</h1><button class="btn btn-ghost btn-sm refresh" data-act="refresh">${icon('refresh')}Refresh</button></div>
@@ -55,7 +60,7 @@
   }
   async function loadCounts() { const r = await api('/api/admin/overview'); if (r.ok) { S.stats = r.stats; const po = $('.orders-count'), pd = $('.deposits-count'); if (po && r.stats.pendingOrders) { po.textContent = r.stats.pendingOrders; po.style.display = ''; } if (pd && r.stats.pendingDeposits) { pd.textContent = r.stats.pendingDeposits; pd.style.display = ''; } } }
 
-  function go(tab) { S.tab = tab; document.querySelectorAll('.side nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab)); const titles = { dash: 'Dashboard', orders: 'Orders', deposits: 'Deposits', payments: 'Payment Methods', services: 'Services & Forms', users: 'Users', notices: 'Notices', texts: 'Website texts', layout: 'Layout (show / hide)', settings: 'Settings' }; $('#title').textContent = titles[tab]; S.menuOpen = false; syncMenu(); const views = { dash: vDash, orders: vOrders, deposits: vDeposits, payments: vPayments, services: vServices, users: vUsers, notices: vNotices, texts: vTexts, layout: vLayout, settings: vSettings }; (views[tab] || vDash)(); }
+  function go(tab) { S.tab = tab; document.querySelectorAll('.side nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab)); const titles = { dash: 'Dashboard', orders: 'Orders', deposits: 'Deposits', payments: 'Payment methods', services: 'Products', users: 'Users', notices: 'Notices', texts: 'Website texts', layout: 'Layout (show / hide)', settings: 'Settings' }; $('#title').textContent = titles[tab]; S.menuOpen = false; syncMenu(); const views = { dash: vDash, orders: vOrders, deposits: vDeposits, payments: vPayments, services: vServices, users: vUsers, notices: vNotices, texts: vTexts, layout: vLayout, settings: vSettings }; (views[tab] || vDash)(); }
   function syncMenu() { const s = $('.side'), sc = $('.side-scrim'); if (s) s.classList.toggle('on', S.menuOpen); if (sc) sc.classList.toggle('on', S.menuOpen); }
 
   /* ---------- dashboard ---------- */
