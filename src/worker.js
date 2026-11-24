@@ -201,7 +201,14 @@ async function runProductApi(order, svc, settings) {
   try {
     const rr = await fetch(url, init);
     const text = await rr.text();
-    let data; try { data = JSON.parse(text); } catch { data = text; }
+    let data;
+    try { data = JSON.parse(text); }
+    catch {
+      // some providers stream Server-Sent Events (event:/data: lines); keep the last parseable "data: {...}"
+      let best;
+      for (const m of text.matchAll(/data:\s*(\{.*\})\s*$/gm)) { try { best = JSON.parse(m[1]); } catch {} }
+      data = best != null ? best : text;
+    }
     const extId = a.idPath ? getByPath(data, a.idPath) : undefined;
     const okFlag = rr.ok && (a.idPath ? (extId != null && extId !== '') : true);
     return { ok: okFlag, status: rr.status, extId: extId != null ? String(extId) : '', resp: typeof data === 'string' ? data.slice(0, 600) : data, error: okFlag ? '' : ('http ' + rr.status) };
