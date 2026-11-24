@@ -33,7 +33,7 @@
   const T = {
     dashboard: { bn: 'ড্যাশবোর্ড', en: 'Dashboard' }, addMoney: { bn: 'অ্যাড মানি', en: 'Add Money' }, recharge: { bn: 'রিচার্জ', en: 'Recharge' },
     orders: { bn: 'অর্ডার', en: 'Orders' }, referrals: { bn: 'রেফারেল', en: 'Referrals' }, profile: { bn: 'প্রোফাইল', en: 'Profile' },
-    transactions: { bn: 'লেনদেন', en: 'Transactions' }, allCats: { bn: 'সব', en: 'All' }, txnHistory: { bn: 'ট্রানজেকশন হিস্টোরি', en: 'Transaction history' }, rules: { bn: 'নিয়ম ও শর্তাবলী', en: 'Rules & Regulations' },
+    transactions: { bn: 'লেনদেন', en: 'Transactions' }, allCats: { bn: 'সব', en: 'All' }, txnHistory: { bn: 'ট্রানজেকশন হিস্টোরি', en: 'Transaction history' }, rules: { bn: 'নিয়ম ও শর্তাবলী', en: 'Rules & Regulations' }, cancelOrder: { bn: 'অর্ডার বাতিল ও রিফান্ড', en: 'Cancel order & refund' },
     home: { bn: 'হোম', en: 'Home' }, services: { bn: 'সার্ভিস', en: 'Services' }, balance: { bn: 'ব্যালেন্স', en: 'Balance' },
     walletBalance: { bn: 'ওয়ালেট ব্যালেন্স', en: 'Wallet Balance' }, quickServices: { bn: 'কুইক সার্ভিস', en: 'Quick Services' },
     priceList: { bn: 'মূল্য তালিকা', en: 'Price List' }, recentOrders: { bn: 'সাম্প্রতিক অর্ডার', en: 'Recent Orders' },
@@ -552,7 +552,8 @@
       ${(o.note || o.respImg) ? `<div class="resp"><div class="resp-h">${icon('check')}${S.lang === 'en' ? 'Admin response' : 'অ্যাডমিন রেসপন্স'}</div>
         ${o.note ? `<div class="resp-b" id="resp-txt">${esc(o.note)}</div><button class="btn btn-ghost btn-sm" data-copy="${esc(o.note)}" style="margin-top:8px">${icon('copy')}${u('copy')}</button>` : ''}
         ${o.respImg ? `<a class="resp-img" href="${esc(o.respImg)}" target="_blank" rel="noopener"><img src="${esc(o.respImg)}" alt="" loading="lazy"><span class="resp-dl">${icon('eye')}${S.lang === 'en' ? 'View / download' : 'দেখুন / ডাউনলোড'}</span></a>` : ''}
-      </div>` : ''}`);
+      </div>` : ''}
+      ${o.status === 'pending' && o.key ? `<button class="btn btn-ghost" data-cancel-order="${esc(o.key)}" style="color:var(--bad);margin-top:14px;width:100%">${icon('x')}${u('cancelOrder')}</button>` : ''}`);
   }
   function openSheet(html) { const s = document.createElement('div'); s.className = 'modal-scrim'; s.dataset.sheet = '1'; s.innerHTML = `<div class="sheet">${html}</div>`; document.body.appendChild(s); }
   function docSheet(kind) { const en = S.lang === 'en'; const title = kind === 'privacy' ? (en ? 'Privacy Policy' : 'প্রাইভেসি পলিসি') : (en ? 'Terms & Conditions' : 'শর্তাবলী'); const body = kind === 'privacy' ? (S.settings.privacy || '') : (S.settings.rules || ''); openSheet(`<div class="sheet-h"><h3>${esc(title)}</h3><button class="x" data-sheet-close>${icon('x')}</button></div><div class="doc-body">${esc(body)}</div>`); }
@@ -569,6 +570,7 @@
     const cp = e.target.closest('[data-copy]'); if (cp) { navigator.clipboard && navigator.clipboard.writeText(cp.dataset.copy); toast(u('copied')); return; }
     const sh = e.target.closest('[data-share]'); if (sh) { if (navigator.share) navigator.share({ url: sh.dataset.share, title: S.settings.brandA + ' ' + S.settings.brandB }); else { navigator.clipboard && navigator.clipboard.writeText(sh.dataset.share); toast(u('copied')); } return; }
     const ord = e.target.closest('[data-order]'); if (ord) { try { orderSheet(JSON.parse(ord.dataset.order)); } catch (x) {} return; }
+    const co = e.target.closest('[data-cancel-order]'); if (co) { const en = S.lang === 'en'; if (!confirm(en ? 'Cancel this order and get a full refund?' : 'অর্ডার বাতিল করে পুরো টাকা ফেরত নিবেন?')) return; const r = await api('/api/order-cancel', { key: co.dataset.cancelOrder }); if (r.ok) { if (typeof r.balance === 'number') S.user.balance = r.balance; const m = document.querySelector('[data-sheet]'); if (m) m.remove(); toast(en ? 'Cancelled & refunded ✓' : 'বাতিল ও রিফান্ড হয়েছে ✓'); render(); } else toast(r.error === 'not_pending' ? (en ? 'Only pending orders can be cancelled' : 'শুধু পেন্ডিং অর্ডার বাতিল করা যায়') : 'Error'); return; }
     const doc = e.target.closest('[data-doc]'); if (doc) { e.preventDefault(); docSheet(doc.dataset.doc); return; }
     if (e.target.closest('[data-sheet-close]') || (e.target.classList && e.target.classList.contains('modal-scrim'))) { const m = document.querySelector('[data-sheet]'); if (m) m.remove(); return; }
   });

@@ -303,9 +303,22 @@ async function handleApi(req, env, url, path, u, secure) {
     const ul = (await env.DATA.get('uo:' + u.id, 'json')) || [];
     const items = await Promise.all(ul.slice(0, 50).map(async (o) => {
       const full = await env.DATA.get(o.key, 'json');
-      return full || o;
+      return { ...(full || o), key: o.key };
     }));
     return json({ ok: true, items: items.filter(Boolean) });
+  }
+  if (path === '/api/order-cancel' && req.method === 'POST') {
+    let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
+    const okey = clip(b.key, 60);
+    const o = await env.DATA.get(okey, 'json');
+    if (!o || o.uid !== u.id) return json({ ok: false, error: 'not_found' }, 404);
+    if (o.status !== 'pending') return json({ ok: false, error: 'not_pending' }, 400);
+    const owner = await env.DATA.get('u:' + u.id, 'json');
+    if (owner) { owner.balance = Math.round((owner.balance || 0) + o.amount); await env.DATA.put('u:' + u.id, JSON.stringify(owner)); }
+    o.status = 'rejected'; o.note = 'Cancelled by customer — amount refunded.'; o.cancelledByUser = true;
+    await env.DATA.delete('apiq:' + okey);
+    await saveOrderStatus(env, okey, o);
+    return json({ ok: true, balance: owner ? owner.balance : undefined });
   }
 
   if (path === '/api/deposit' && req.method === 'POST') {
