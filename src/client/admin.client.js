@@ -105,6 +105,7 @@
         <div class="flex" style="justify-content:space-between"><b>Auto-delivery (API)</b><span class="badge ${o.api.state === 'ok' ? 'b-approved' : o.api.state === 'failed' ? 'b-rejected' : ''}">${esc(o.api.state || '')}</span></div>
         ${o.api.extId ? `<div class="muted" style="font-size:12px;margin-top:5px">External ID: <b class="mono">${esc(o.api.extId)}</b></div>` : ''}
         ${o.api.error ? `<div style="font-size:12px;color:#dc2626;margin-top:5px">Error: ${esc(o.api.error)}</div>` : ''}
+        ${o.api.resp ? `<div class="muted" style="font-size:11px;margin-top:5px;word-break:break-word">Provider says: <b>${esc(typeof o.api.resp === 'string' ? o.api.resp : JSON.stringify(o.api.resp))}</b></div>` : ''}
         <div class="muted" style="font-size:11px;margin-top:3px">Attempts: ${o.api.attempts || 1}</div>
         <button type="button" class="btn btn-ghost btn-sm" id="o-retry" style="margin-top:8px">${icon('refresh')}Retry API now</button>
       </div>` : ''}
