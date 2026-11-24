@@ -187,6 +187,14 @@ function apiSubst(tpl, order, secrets) {
     });
 }
 const getByPath = (obj, path) => !path ? undefined : String(path).split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+// parse a provider response body: plain JSON, or a Server-Sent-Events stream (take the last parseable "data: {...}")
+function parseApiBody(text) {
+  if (text == null || typeof text !== 'string') return text;
+  try { return JSON.parse(text); } catch {}
+  let best;
+  for (const m of text.matchAll(/data:\s*(\{.*\})\s*$/gm)) { try { best = JSON.parse(m[1]); } catch {} }
+  return best != null ? best : text;
+}
 async function runProductApi(order, svc, settings) {
   const a = svc.api || {};
   if (!a.on || !a.url) return { ok: false, error: 'noapi' };
@@ -201,14 +209,7 @@ async function runProductApi(order, svc, settings) {
   try {
     const rr = await fetch(url, init);
     const text = await rr.text();
-    let data;
-    try { data = JSON.parse(text); }
-    catch {
-      // some providers stream Server-Sent Events (event:/data: lines); keep the last parseable "data: {...}"
-      let best;
-      for (const m of text.matchAll(/data:\s*(\{.*\})\s*$/gm)) { try { best = JSON.parse(m[1]); } catch {} }
-      data = best != null ? best : text;
-    }
+    const data = parseApiBody(text);
     const extId = a.idPath ? getByPath(data, a.idPath) : undefined;
     const okFlag = rr.ok && (a.idPath ? (extId != null && extId !== '') : true);
     return { ok: okFlag, status: rr.status, extId: extId != null ? String(extId) : '', resp: typeof data === 'string' ? data.slice(0, 600) : data, error: okFlag ? '' : ('http ' + rr.status) };
@@ -235,6 +236,7 @@ async function retryApiQueue(env) {
     const svc = services.find((s) => s.id === order.svcId);
     if (!svc || !svc.api || !svc.api.on) { await env.DATA.delete(qk.name); continue; }
     if (order.api.extId) { order.api.state = 'ok'; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; await env.DATA.delete(qk.name); await saveOrderStatus(env, okey, order); continue; }
+    { const prevId = getByPath(parseApiBody(order.api.resp), svc.api.idPath); if (prevId != null && prevId !== '') { order.api.extId = String(prevId); order.api.state = 'ok'; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; await env.DATA.delete(qk.name); await saveOrderStatus(env, okey, order); continue; } }
     const res = await runProductApi(order, svc, settings);
     order.api.attempts = (order.api.attempts || 1) + 1;
     order.api.resp = res.resp; order.api.error = res.error || ''; order.api.status = res.status || 0;
@@ -486,6 +488,8 @@ async function handleAdmin(req, env, url, path, u) {
     if (!svc || !svc.api || !svc.api.on) return json({ ok: false, error: 'noapi' }, 400);
     // safety: if this order already got an external id, it already succeeded — don't call again (avoid double delivery)
     if (order.api && order.api.extId) { order.api.state = 'ok'; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; await env.DATA.delete('apiq:' + okey); await saveOrderStatus(env, okey, order); return json({ ok: true, api: order.api, status: order.status, already: true }); }
+    // recover: the stored response may already hold a success id (e.g. an SSE launch mis-parsed earlier) — never re-call then
+    { const prevId = order.api ? getByPath(parseApiBody(order.api.resp), svc.api.idPath) : undefined; if (prevId != null && prevId !== '') { order.api.extId = String(prevId); order.api.state = 'ok'; order.api.error = ''; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; await env.DATA.delete('apiq:' + okey); await saveOrderStatus(env, okey, order); return json({ ok: true, api: order.api, status: order.status, recovered: true }); } }
     const res = await runProductApi(order, svc, await getSettings(env));
     order.api = order.api || {}; order.api.attempts = (order.api.attempts || 1) + 1; order.api.resp = res.resp; order.api.error = res.error || ''; order.api.status = res.status || 0;
     if (res.ok) { order.api.state = 'ok'; order.api.extId = res.extId || ''; order.status = svc.api.doneOnOk ? 'done' : 'processing'; await env.DATA.delete('apiq:' + okey); }
