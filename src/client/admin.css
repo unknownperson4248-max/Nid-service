@@ -186,3 +186,4 @@ textarea{resize:vertical;min-height:60px}
 .cat-actions{display:flex;align-items:center;gap:2px;margin-left:auto;flex:none}
 .cat-actions .ib{width:30px;height:30px}
 .cat-actions .btn-sm{padding:7px 10px}
+.opt-row{flex-wrap:wrap}

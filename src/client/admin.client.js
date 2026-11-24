@@ -243,6 +243,7 @@
       if (bb.dataset.apipreset === 'ffglory') {
         editing.api = { on: true, method: 'POST', url: 'https://ffglory.pro/api/client/auto-clan-group', query: '{"api_key":"{{FFGLORY_KEY}}"}', headers: '{"x-api-key":"{{FFGLORY_MKEY}}"}', body: '{"region":"{region}","clan_id":"{clan_id}"}', idPath: 'group_id' };
         if (!editing.fields.some((f) => f.key === 'region')) editing.fields.unshift({ key: 'region', type: 'select', required: true, label: { bn: 'রিজন নির্বাচন করুন', en: 'Region' }, options: [{ label: '🇧🇩 বাংলাদেশ', value: 'bd' }, { label: '🌍 Middle East', value: 'me' }] });
+        if (!editing.fields.some((f) => f.key === 'duration')) { const ri = editing.fields.findIndex((f) => f.key === 'region'); editing.fields.splice(ri + 1, 0, { key: 'duration', type: 'select', required: true, label: { bn: 'সময়কাল', en: 'Duration' }, options: [{ label: '৮ ঘণ্টা', value: '8h', price: 0, note: '8 hours · 1 credit' }, { label: '১৬ ঘণ্টা', value: '16h', note: '+8 hours · 2 credits' }] }); }
         if (!editing.fields.some((f) => f.key === 'clan_id')) editing.fields.push({ key: 'clan_id', type: 'text', required: true, label: { bn: 'ক্লান আইডি (UID)', en: 'Clan ID' }, ph: '123456789' });
         toast('ffglory ready ✓ region + Clan ID boxes added');
       } else {
@@ -282,7 +283,7 @@
       ${f.type === 'select' ? `<div><div class="muted" style="font-size:12px;margin:4px 0">Options (label + price; empty price = no charge)</div><div data-opts="${i}">${(f.options || []).map((o, oi) => optRow(i, oi, o)).join('')}</div><button class="btn btn-ghost btn-sm" data-add-opt="${i}">${icon('plus')}Add option</button></div>` : ''}
     </div>`;
   }
-  const optRow = (fi, oi, o) => `<div class="opt-row" data-opt="${fi}:${oi}"><input data-fo="${fi}:${oi}:label" placeholder="label e.g. 🇧🇩 Bangladesh" value="${esc(o.label || '')}"><input data-fo="${fi}:${oi}:value" placeholder="API value" value="${esc(o.value || '')}" style="max-width:100px"><input data-fo="${fi}:${oi}:price" type="number" placeholder="price" value="${o.price != null ? o.price : ''}" style="max-width:80px"><button class="btn btn-bad btn-sm" data-del-opt="${fi}:${oi}">${icon('x')}</button></div>`;
+  const optRow = (fi, oi, o) => `<div class="opt-row" data-opt="${fi}:${oi}"><input data-fo="${fi}:${oi}:label" placeholder="label e.g. ১৬ ঘণ্টা" value="${esc(o.label || '')}"><input data-fo="${fi}:${oi}:value" placeholder="API value" value="${esc(o.value || '')}" style="max-width:95px"><input data-fo="${fi}:${oi}:price" type="number" placeholder="price" value="${o.price != null ? o.price : ''}" style="max-width:75px"><button class="btn btn-bad btn-sm" data-del-opt="${fi}:${oi}">${icon('x')}</button><input data-fo="${fi}:${oi}:note" placeholder="small note (e.g. +8h · 1 credit)" value="${esc(o.note || '')}" style="flex:1 1 100%"></div>`;
 
   function readFieldsFromDom() {
     // sync editing.fields from inputs
@@ -295,7 +296,7 @@
     });
     document.querySelectorAll('[data-fo]').forEach((el) => {
       const [fi, oi, key] = el.dataset.fo.split(':'); const f = editing.fields[+fi]; if (!f || !f.options || !f.options[+oi]) return;
-      if (key === 'price') f.options[+oi].price = el.value === '' ? undefined : Number(el.value); else if (key === 'value') f.options[+oi].value = el.value.trim(); else f.options[+oi].label = el.value;
+      if (key === 'price') f.options[+oi].price = el.value === '' ? undefined : Number(el.value); else if (key === 'value') f.options[+oi].value = el.value.trim(); else if (key === 'note') f.options[+oi].note = el.value.trim(); else f.options[+oi].label = el.value;
     });
   }
   async function saveService() {
