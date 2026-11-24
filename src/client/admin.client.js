@@ -176,11 +176,13 @@
     return `<div class="prod-row" data-prod="${s.id}">
       <span class="prod-thumb">${s.image ? `<img src="${esc(s.image)}" alt="">` : `<span style="background:${s.color || '#0f766e'}">${icon(iconName(s.icon))}</span>`}</span>
       <div class="prod-info"><b>${esc(tl(s.name))}</b><small>${esc(tl(s.sub))} • ${priceLbl}${s.featured ? ' • ★ featured' : ''}</small></div>
-      <label class="tgl" title="Active"><input type="checkbox" data-toggle-svc="${s.id}" ${s.active !== false ? 'checked' : ''}><i></i></label>
-      <button type="button" class="ib" data-move-svc="${s.id}:up" title="Move up">${icon('up')}</button>
-      <button type="button" class="ib" data-move-svc="${s.id}:down" title="Move down">${icon('down')}</button>
-      <button type="button" class="ib" data-edit-svc="${s.id}" title="Edit">${icon('edit')}</button>
-      <button type="button" class="ib" data-del-svc="${s.id}" title="Delete" style="color:var(--bad)">${icon('trash')}</button>
+      <div class="prod-actions">
+        <label class="tgl" title="Active"><input type="checkbox" data-toggle-svc="${s.id}" ${s.active !== false ? 'checked' : ''}><i></i></label>
+        <button type="button" class="ib" data-move-svc="${s.id}:up" title="Move up">${icon('up')}</button>
+        <button type="button" class="ib" data-move-svc="${s.id}:down" title="Move down">${icon('down')}</button>
+        <button type="button" class="ib" data-edit-svc="${s.id}" title="Edit">${icon('edit')}</button>
+        <button type="button" class="ib" data-del-svc="${s.id}" title="Delete" style="color:var(--bad)">${icon('trash')}</button>
+      </div>
     </div>`;
   }
   async function saveServiceList(list) { S.services = list; const r = await api('/api/admin/services', { services: list }); if (!r.ok) toast('Error'); return r.ok; }
