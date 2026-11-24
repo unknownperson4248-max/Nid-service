@@ -96,6 +96,13 @@
     modal(`Order ${esc(o.id)}`, `
       <div class="flex" style="margin-bottom:10px">${badge(o.status)}<span class="pill">${new Date(o.ts).toLocaleString('en-GB')}</span></div>
       <div class="kvs"><div><span class="k">Customer:</span> <b>${esc(o.uname)}</b></div><div><span class="k">Service:</span> <b>${esc(tl(o.svcName))}</b></div><div><span class="k">Amount:</span> <b>${money(o.amount)}</b></div>${rows}</div>
+      ${o.api ? `<div class="field" style="background:#f3f6f5;border:1px solid var(--line);border-radius:10px;padding:10px">
+        <div class="flex" style="justify-content:space-between"><b>Auto-delivery (API)</b><span class="badge ${o.api.state === 'ok' ? 'b-approved' : o.api.state === 'failed' ? 'b-rejected' : ''}">${esc(o.api.state || '')}</span></div>
+        ${o.api.extId ? `<div class="muted" style="font-size:12px;margin-top:5px">External ID: <b class="mono">${esc(o.api.extId)}</b></div>` : ''}
+        ${o.api.error ? `<div style="font-size:12px;color:#dc2626;margin-top:5px">Error: ${esc(o.api.error)}</div>` : ''}
+        <div class="muted" style="font-size:11px;margin-top:3px">Attempts: ${o.api.attempts || 1}</div>
+        <button type="button" class="btn btn-ghost btn-sm" id="o-retry" style="margin-top:8px">${icon('refresh')}Retry API now</button>
+      </div>` : ''}
       <div class="field"><label>Status (set manually)</label><select id="o-status">${['pending', 'processing', 'done', 'rejected'].map((s) => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s === 'done' ? 'done (complete)' : s === 'rejected' ? 'rejected / cancel (refunds balance)' : s}</option>`).join('')}</select></div>
       <div class="field"><label>Response message to customer</label><textarea id="o-note" maxlength="1000" placeholder="e.g. Delivered. Thanks!">${esc(o.note || '')}</textarea></div>
       <div class="field"><label>Response image (optional)</label><div class="flex"><div id="o-imgprev" class="iconbox" style="width:54px;height:54px;background:#eef2f5;overflow:hidden">${o.respImg ? `<img src="${esc(o.respImg)}" style="width:100%;height:100%;object-fit:cover">` : icon('eye')}</div>
@@ -107,6 +114,7 @@
     $('#o-imgdel').addEventListener('click', () => { respImg = ''; $('#o-imgprev').innerHTML = icon('eye'); $('#o-imgdel').style.display = 'none'; });
     $('#o-imgfile').addEventListener('change', async (e) => { const f = e.target.files[0]; if (!f) return; if (f.size > 2 * 1024 * 1024) { toast('Max 2MB'); return; } const dataUrl = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(f); }); toast('Uploading...'); const up = await api('/api/admin/upload', { dataUrl }); if (up.ok) { respImg = up.path; $('#o-imgprev').innerHTML = `<img src="${esc(up.path)}" style="width:100%;height:100%;object-fit:cover">`; $('#o-imgdel').style.display = ''; } else toast('Upload failed'); });
     $('#o-save').addEventListener('click', async () => { const r = await api('/api/admin/order', { key: o.key, status: $('#o-status').value, note: $('#o-note').value, respImg }); if (r.ok) { toast('Updated'); closeModal(); vOrders(); loadCounts(); } else toast('Error'); });
+    { const rb = $('#o-retry'); if (rb) rb.addEventListener('click', async () => { rb.disabled = true; toast('Calling API...'); const r = await api('/api/admin/order-retry', { key: o.key }); rb.disabled = false; if (r.ok) { toast(r.api && r.api.state === 'ok' ? 'Success ✓' : 'Failed: ' + ((r.api && r.api.error) || '')); closeModal(); vOrders(); } else toast(r.error === 'noapi' ? 'No API set for this product' : 'Error'); }); }
   }
 
   /* ---------- deposits ---------- */
@@ -200,14 +208,27 @@
       </div>
       <div style="margin-bottom:8px"><b style="font-family:var(--disp)">Order boxes (fields)</b><div class="muted" style="font-size:12px">Quick add a ready box, then edit it. Each box can be required or optional.</div></div>
       <div class="qa-row">${[['player', 'FF Player ID', 'bolt'], ['dropdown', 'Dropdown / package', 'grid'], ['image', 'Image upload', 'eye'], ['number', 'Number', 'money'], ['note', 'Note', 'edit'], ['blank', 'Blank box', 'plus']].map(([k, lbl, ic]) => `<button type="button" class="qa" data-qa="${k}">${icon(ic)}${lbl}</button>`).join('')}</div>
-      <div id="fields-wrap">${s.fields.map(fieldEditor).join('')}</div>`,
+      <div id="fields-wrap">${s.fields.map(fieldEditor).join('')}</div>
+      <div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px">
+        <label class="flex" style="gap:6px;font-weight:700"><input type="checkbox" id="f-api-on" ${(s.api && s.api.on) ? 'checked' : ''} style="width:auto"> Auto-delivery via API</label>
+        <div class="muted" style="font-size:12px;margin:6px 0 10px">When a customer pays, the system calls this API automatically. Use <code>{boxkey}</code> for an order box value, <code>{{SECRET}}</code> for a saved secret (Settings → API). <code>{amount}</code>, <code>{orderId}</code> also work. Leave off to keep this product manual.</div>
+        <div class="grid2">
+          <div class="field"><label>Method</label><select id="f-api-method">${['POST', 'GET'].map((m) => `<option ${((s.api && s.api.method) || 'POST') === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
+          <div class="field"><label>Response ID path</label><input id="f-api-idpath" value="${esc((s.api && s.api.idPath) || '')}" placeholder="e.g. group_id or order"></div>
+        </div>
+        <div class="field"><label>URL</label><input id="f-api-url" value="${esc((s.api && s.api.url) || '')}" placeholder="https://ffglory.pro/api/client/auto-clan-group"></div>
+        <div class="field"><label>Query params (JSON)</label><input id="f-api-query" value="${esc((s.api && s.api.query) || '')}" placeholder='{"api_key":"{{FFGLORY_KEY}}"}'></div>
+        <div class="field"><label>Headers (JSON)</label><input id="f-api-headers" value="${esc((s.api && s.api.headers) || '')}" placeholder='{"x-api-key":"{{FFGLORY_MKEY}}"}'></div>
+        <div class="field"><label>Body (JSON)</label><textarea id="f-api-body" rows="3" placeholder='{"region":"bd","clan_id":"{clan_id}"}'>${esc((s.api && s.api.body) || '')}</textarea></div>
+      </div>`,
       `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="svc-save">${icon('check')}Save product</button>`);
     $('#svc-save').addEventListener('click', saveService);
     $('#f-imgbtn').addEventListener('click', () => $('#f-imgfile').click());
     $('#f-imgfile').addEventListener('change', uploadImage);
     const del = $('#f-imgdel'); if (del) del.addEventListener('click', () => { readFieldsFromDom(); syncSvcText(); editing.image = ''; svcModal(); });
   }
-  function syncSvcText() { const g = (id) => { const el = $(id); return el ? el.value : undefined; }; const n = g('#f-name'); if (n !== undefined) editing.name = n.trim(); const sb = g('#f-sub'); if (sb !== undefined) editing.sub = sb.trim(); const no = g('#f-note'); if (no !== undefined) editing.note = no.trim(); const cat = g('#f-cat'); if (cat !== undefined) editing.cat = cat; const ic = g('#f-icon'); if (ic !== undefined) editing.icon = ic; const col = g('#f-color'); if (col !== undefined) editing.color = col; const pr = g('#f-price'); if (pr !== undefined) editing.price = Number(pr) || 0; const ac = $('#f-active'); if (ac) editing.active = ac.checked; const fe = $('#f-featured'); if (fe) editing.featured = fe.checked; }
+  function syncSvcText() { const g = (id) => { const el = $(id); return el ? el.value : undefined; }; const n = g('#f-name'); if (n !== undefined) editing.name = n.trim(); const sb = g('#f-sub'); if (sb !== undefined) editing.sub = sb.trim(); const no = g('#f-note'); if (no !== undefined) editing.note = no.trim(); const cat = g('#f-cat'); if (cat !== undefined) editing.cat = cat; const ic = g('#f-icon'); if (ic !== undefined) editing.icon = ic; const col = g('#f-color'); if (col !== undefined) editing.color = col; const pr = g('#f-price'); if (pr !== undefined) editing.price = Number(pr) || 0; const ac = $('#f-active'); if (ac) editing.active = ac.checked; const fe = $('#f-featured'); if (fe) editing.featured = fe.checked;
+    const ao = $('#f-api-on'); if (ao) { editing.api = editing.api || {}; editing.api.on = ao.checked; editing.api.method = (g('#f-api-method') || 'POST'); editing.api.url = (g('#f-api-url') || '').trim(); editing.api.query = (g('#f-api-query') || '').trim(); editing.api.headers = (g('#f-api-headers') || '').trim(); editing.api.body = (g('#f-api-body') || '').trim(); editing.api.idPath = (g('#f-api-idpath') || '').trim(); } }
   async function uploadImage(e) {
     const file = e.target.files[0]; if (!file) return;
     if (file.size > 2 * 1024 * 1024) { toast('Image too big (max 2MB)'); return; }
@@ -355,7 +376,8 @@
     const r = await api('/api/admin/settings'); const s = r.settings || {};
     S.logo = s.logo || ''; S.heroImg = s.heroImg || '';
     S.banners = (Array.isArray(s.banners) ? s.banners : []).map((b) => ({ img: (b && b.img) || '', link: (b && b.link) || '' })).filter((b) => b.img);
-    const setTabs = [['general', 'eye', 'General'], ['banner', 'image', 'Banner'], ['contact', 'home', 'Contact'], ['rules', 'edit', 'Rules'], ['login', 'lock', 'Login']];
+    S.secNames = r.apiSecretNames || [];
+    const setTabs = [['general', 'eye', 'General'], ['banner', 'image', 'Banner'], ['contact', 'home', 'Contact'], ['rules', 'edit', 'Rules'], ['login', 'lock', 'Login'], ['api', 'cog', 'API keys']];
     c.innerHTML = `<div class="set-tabs">${setTabs.map(([k, ic, l]) => `<button data-settab="${k}" class="${(S.setTab || 'general') === k ? 'on' : ''}">${icon(ic)}<span>${l}</span></button>`).join('')}</div>
     <div class="card" data-sb="general"><div class="card-h">${icon('eye')}Website, SEO & Theme</div><div class="card-b">
       <div class="field"><label>Website title (browser tab & Google)</label><input id="s-seot" maxlength="90" value="${esc(s.seoTitle || '')}" placeholder="e.g. WizeFF TopUp – Free Fire Diamond Top Up BD"></div>
@@ -406,7 +428,18 @@
       <div class="field"><textarea id="s-rules" rows="6" maxlength="4000" placeholder="Write your rules / terms — shown at the bottom of the home page">${esc(s.rules || '')}</textarea></div>
       <div class="muted" style="font-size:12px">Appears at the bottom of the home dashboard, next to your brand logo. Leave blank to hide.</div>
     </div></div>
+    <div class="card" data-sb="api" style="margin-top:16px"><div class="card-h">${icon('lock')}API keys (for product auto-delivery)</div><div class="card-b">
+      <div class="muted" style="font-size:12px;margin-bottom:12px">Save provider API keys here (ffglory, SMM, etc.), then reference them in a product's Auto-delivery as <code>{{NAME}}</code>. Stored securely, never sent to customers.</div>
+      <div id="sec-list"></div>
+      <div class="grid2"><div class="field"><label>Key name</label><input id="sec-name" maxlength="40" placeholder="FFGLORY_KEY"></div>
+        <div class="field"><label>Value (secret)</label><input id="sec-val" type="password" autocomplete="new-password" maxlength="500" placeholder="paste the key"></div></div>
+      <button type="button" class="btn btn-sm" id="sec-add">${icon('plus')}Save key</button>
+    </div></div>
     <div style="margin-top:16px"><button class="btn btn-ok" id="s-save">${icon('check')}Save settings</button></div>`;
+    const renderSecrets = () => { const box = $('#sec-list'); if (!box) return; box.innerHTML = (S.secNames && S.secNames.length) ? S.secNames.map((nm) => `<div class="flex" style="justify-content:space-between;background:#f3f6f5;border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:8px"><b class="mono">${esc(nm)}</b><button type="button" class="ib ib-bad" data-sec-del="${esc(nm)}" title="Remove">${icon('trash')}</button></div>`).join('') : '<div class="muted" style="font-size:12px;margin-bottom:10px">No keys saved yet.</div>';
+      box.querySelectorAll('[data-sec-del]').forEach((bb) => bb.addEventListener('click', async () => { if (!confirm('Remove key ' + bb.dataset.secDel + '?')) return; const rr = await api('/api/admin/secret', { name: bb.dataset.secDel, remove: true }); if (rr.ok) { S.secNames = rr.names || []; renderSecrets(); toast('Removed'); } else toast('Error'); })); };
+    renderSecrets();
+    $('#sec-add').addEventListener('click', async () => { const nm = ($('#sec-name').value || '').trim().replace(/[^A-Za-z0-9_]/g, ''); const vl = $('#sec-val').value; if (!nm) { toast('Enter a key name'); return; } if (!vl) { toast('Enter the value'); return; } const rr = await api('/api/admin/secret', { name: nm, value: vl }); if (rr.ok) { S.secNames = rr.names || []; $('#sec-name').value = ''; $('#sec-val').value = ''; renderSecrets(); toast('Key saved ✓'); } else toast('Error'); });
     const applySetTab = () => { const sec = S.setTab || 'general'; document.querySelectorAll('.set-tabs [data-settab]').forEach((bb) => bb.classList.toggle('on', bb.dataset.settab === sec)); document.querySelectorAll('#content [data-sb]').forEach((cd) => { cd.style.display = cd.dataset.sb === sec ? '' : 'none'; }); };
     document.querySelectorAll('.set-tabs [data-settab]').forEach((bb) => bb.addEventListener('click', () => { S.setTab = bb.dataset.settab; applySetTab(); const m = $('#content'); if (m) m.scrollTop = 0; window.scrollTo(0, 0); }));
     applySetTab();

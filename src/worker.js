@@ -174,6 +174,67 @@ function computeOrder(svc, fields) {
   return { amount: Math.round(amount), clean };
 }
 
+/* ---------------- per-product auto-delivery via external API ---------------- */
+const orderMeta = (o) => ({ id: o.id, uid: o.uid, status: o.status, ts: o.ts, n: o.svcName, un: maskName(o.uname), amt: o.amount, cat: o.cat });
+function apiSubst(tpl, order, secrets) {
+  return String(tpl == null ? '' : tpl)
+    .replace(/\{\{(\w+)\}\}/g, (_, k) => String((secrets && secrets[k]) != null ? secrets[k] : ''))
+    .replace(/\{(\w+)\}/g, (_, k) => {
+      if (k === 'amount' || k === 'total') return String(order.amount);
+      if (k === 'orderId') return String(order.id);
+      const v = order.fields && order.fields[k];
+      return v == null ? '' : String(v);
+    });
+}
+const getByPath = (obj, path) => !path ? undefined : String(path).split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+async function runProductApi(order, svc, settings) {
+  const a = svc.api || {};
+  if (!a.on || !a.url) return { ok: false, error: 'noapi' };
+  const secrets = settings.apiSecrets || {};
+  const method = (a.method || 'POST').toUpperCase();
+  let url = apiSubst(a.url, order, secrets);
+  if (a.query) { try { const q = JSON.parse(apiSubst(a.query, order, secrets)); const uu = new URL(url); for (const k in q) uu.searchParams.set(k, q[k]); url = uu.toString(); } catch {} }
+  const headers = { 'content-type': 'application/json' };
+  if (a.headers) { try { Object.assign(headers, JSON.parse(apiSubst(a.headers, order, secrets))); } catch {} }
+  const init = { method, headers };
+  if (method !== 'GET' && a.body) init.body = apiSubst(a.body, order, secrets);
+  try {
+    const rr = await fetch(url, init);
+    const text = await rr.text();
+    let data; try { data = JSON.parse(text); } catch { data = text; }
+    const extId = a.idPath ? getByPath(data, a.idPath) : undefined;
+    const okFlag = rr.ok && (a.idPath ? (extId != null && extId !== '') : true);
+    return { ok: okFlag, status: rr.status, extId: extId != null ? String(extId) : '', resp: typeof data === 'string' ? data.slice(0, 600) : data, error: okFlag ? '' : ('http ' + rr.status) };
+  } catch (e) { return { ok: false, error: String((e && e.message) || e).slice(0, 200) }; }
+}
+async function saveOrderStatus(env, key, order) {
+  await env.DATA.put(key, JSON.stringify(order), { metadata: orderMeta(order) });
+  const ul = (await env.DATA.get('uo:' + order.uid, 'json')) || [];
+  const i = ul.findIndex((x) => x.id === order.id);
+  if (i >= 0) { ul[i].status = order.status; await env.DATA.put('uo:' + order.uid, JSON.stringify(ul)); }
+}
+async function retryApiQueue(env) {
+  const [settings, services] = await Promise.all([getSettings(env), getServices(env)]);
+  const t = now();
+  const keys = (await env.DATA.list({ prefix: 'apiq:', limit: 300 })).keys;
+  const backoff = [60, 120, 300, 600, 1800]; // seconds
+  for (const qk of keys) {
+    const okey = qk.name.slice(5);
+    const order = await env.DATA.get(okey, 'json');
+    if (!order || !order.api || order.api.state !== 'queued') { await env.DATA.delete(qk.name); continue; }
+    if ((order.api.nextTs || 0) > t) continue;
+    const svc = services.find((s) => s.id === order.svcId);
+    if (!svc || !svc.api || !svc.api.on) { await env.DATA.delete(qk.name); continue; }
+    const res = await runProductApi(order, svc, settings);
+    order.api.attempts = (order.api.attempts || 1) + 1;
+    order.api.resp = res.resp; order.api.error = res.error || '';
+    if (res.ok) { order.api.state = 'ok'; order.api.extId = res.extId || ''; order.status = 'processing'; await env.DATA.delete(qk.name); }
+    else if (order.api.attempts >= 8) { order.api.state = 'failed'; await env.DATA.delete(qk.name); }
+    else order.api.nextTs = t + backoff[Math.min(order.api.attempts - 1, backoff.length - 1)] * 1000;
+    await saveOrderStatus(env, okey, order);
+  }
+}
+
 /* ---------------- customer APIs ---------------- */
 async function handleApi(req, env, url, path, u, secure) {
   const settings = await getSettings(env);
@@ -184,7 +245,7 @@ async function handleApi(req, env, url, path, u, secure) {
     const [services, cats, notices] = await Promise.all([getServices(env), getCats(env), getNotices(env)]);
     const live = (await env.DATA.list({ prefix: 'o:', limit: 12 })).keys.map((k) => k.metadata).filter(Boolean);
     return json({ ok: true, user: u ? pubUser(u) : null, settings: pubSettings(settings),
-      services: services.filter((s) => s.active), cats, notices, live });
+      services: services.filter((s) => s.active).map(({ api, ...rest }) => rest), cats, notices, live });
   }
 
   if (!u) return json({ ok: false, error: 'auth' }, 401);
@@ -219,13 +280,20 @@ async function handleApi(req, env, url, path, u, secure) {
     const ts = now(), id = 'WF' + String(ts).slice(-8) + rid(3).toUpperCase();
     const order = { id, uid: u.id, uname: u.name, svcId: svc.id, svcName: svc.name, cat: svc.cat, fields: r.clean, amount: r.amount, status: 'pending', note: '', ts };
     const key = 'o:' + sortKey(ts);
+    // auto-delivery: call the provider API immediately after payment
+    if (svc.api && svc.api.on && svc.api.url) {
+      const res = await runProductApi(order, svc, settings);
+      order.api = { state: res.ok ? 'ok' : 'queued', extId: res.extId || '', resp: res.resp, error: res.error || '', attempts: 1, nextTs: res.ok ? 0 : ts + 60000 };
+      if (res.ok) order.status = 'processing';
+    }
     await env.DATA.put('u:' + u.id, JSON.stringify(fresh));
-    await env.DATA.put(key, JSON.stringify(order), { metadata: { id, uid: u.id, status: 'pending', ts, n: svc.name, un: maskName(u.name), amt: r.amount, cat: svc.cat } });
+    await env.DATA.put(key, JSON.stringify(order), { metadata: orderMeta(order) });
     const ul = (await env.DATA.get('uo:' + u.id, 'json')) || [];
-    ul.unshift({ key, id, status: 'pending', ts, svcName: svc.name, amount: r.amount });
+    ul.unshift({ key, id, status: order.status, ts, svcName: svc.name, amount: r.amount });
     await env.DATA.put('uo:' + u.id, JSON.stringify(ul.slice(0, 100)));
+    if (order.api && order.api.state === 'queued') await env.DATA.put('apiq:' + key, '1');
     await bumpStat(env, 'orders');
-    return json({ ok: true, order: { id, amount: r.amount, status: 'pending' }, balance: fresh.balance });
+    return json({ ok: true, order: { id, amount: r.amount, status: order.status }, balance: fresh.balance });
   }
 
   if (path === '/api/orders') {
@@ -374,6 +442,30 @@ async function handleAdmin(req, env, url, path, u) {
   if (aset.adminPass) {
     const sess = await env.DATA.get('sess:' + u._token, 'json');
     if (!sess || !sess.adm) return json({ ok: false, error: 'locked' }, 401);
+  }
+  if (path === '/api/admin/secret') {
+    if (req.method !== 'POST') return json({ ok: false }, 405);
+    let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
+    const name = clip(b.name, 40).replace(/[^A-Za-z0-9_]/g, '');
+    if (!name) return json({ ok: false, error: 'name' }, 400);
+    const st = await getSettings(env); st.apiSecrets = (st.apiSecrets && typeof st.apiSecrets === 'object') ? st.apiSecrets : {};
+    if (b.remove) delete st.apiSecrets[name]; else st.apiSecrets[name] = clip(b.value, 500);
+    await env.DATA.put('settings', JSON.stringify(st));
+    return json({ ok: true, names: Object.keys(st.apiSecrets) });
+  }
+  if (path === '/api/admin/order-retry' && req.method === 'POST') {
+    let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
+    const okey = clip(b.key, 40);
+    const order = await env.DATA.get(okey, 'json');
+    if (!order) return json({ ok: false, error: 'nf' }, 404);
+    const services = await getServices(env); const svc = services.find((s) => s.id === order.svcId);
+    if (!svc || !svc.api || !svc.api.on) return json({ ok: false, error: 'noapi' }, 400);
+    const res = await runProductApi(order, svc, await getSettings(env));
+    order.api = order.api || {}; order.api.attempts = (order.api.attempts || 1) + 1; order.api.resp = res.resp; order.api.error = res.error || '';
+    if (res.ok) { order.api.state = 'ok'; order.api.extId = res.extId || ''; order.status = 'processing'; await env.DATA.delete('apiq:' + okey); }
+    else { order.api.state = 'queued'; order.api.nextTs = now() + 60000; await env.DATA.put('apiq:' + okey, '1'); }
+    await saveOrderStatus(env, okey, order);
+    return json({ ok: true, api: order.api, status: order.status });
   }
 
   if (path === '/api/admin/overview') {
@@ -526,6 +618,7 @@ async function handleAdmin(req, env, url, path, u) {
       next.privacy = String(next.privacy || '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').slice(0, 4000);
       next.footerAbout = String(next.footerAbout || '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').slice(0, 600);
       next.telegram = clip(next.telegram, 120); next.telegramCh = clip(next.telegramCh, 120); next.poweredBy = clip(next.poweredBy, 60);
+      next.apiSecrets = (cur.apiSecrets && typeof cur.apiSecrets === 'object') ? cur.apiSecrets : {}; // changed only via /api/admin/secret
       next.heroTitle = clip(next.heroTitle, 80); next.heroSub = clip(next.heroSub, 160); next.heroImg = safeImg(next.heroImg);
       if (Array.isArray(next.banners)) next.banners = next.banners.slice(0, 8).map((b) => ({ img: safeImg(b && b.img), link: clip((b && b.link) || '', 120) })).filter((b) => b.img);
       next.adminPass = cur.adminPass || null; // only changed via /api/admin/setpass, never the generic save
@@ -545,7 +638,7 @@ async function handleAdmin(req, env, url, path, u) {
       return json({ ok: true });
     }
     const st = await getSettings(env);
-    return json({ ok: true, settings: { ...st, adminPass: undefined, googleSecret: undefined, texts: cleanTexts(st.texts), layout: cleanLayout(st.layout) }, adminPassSet: !!st.adminPass, googleSecretSet: !!st.googleSecret, textDefaults: TEXT_DEFAULTS });
+    return json({ ok: true, settings: { ...st, adminPass: undefined, googleSecret: undefined, apiSecrets: undefined, texts: cleanTexts(st.texts), layout: cleanLayout(st.layout) }, adminPassSet: !!st.adminPass, googleSecretSet: !!st.googleSecret, apiSecretNames: Object.keys(st.apiSecrets || {}), textDefaults: TEXT_DEFAULTS });
   }
 
   return json({ ok: false, error: 'not_found' }, 404);
@@ -651,5 +744,8 @@ export default {
     } catch (e) {
       return json({ ok: false, error: 'server', message: String(e && e.message || e) }, 500);
     }
+  },
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(retryApiQueue(env).catch(() => {}));
   },
 };

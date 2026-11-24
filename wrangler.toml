@@ -12,6 +12,9 @@ rules = [
   { type = "Text", globs = ["**/*.html", "**/*.css", "**/*.client.js"], fallthrough = true },
 ]
 
+[triggers]
+crons = ["* * * * *"]
+
 [[kv_namespaces]]
 binding = "DATA"
 id = "46b1b5952f8e4badb37bd59c909ff8b7"

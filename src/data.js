@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS = {
   footerAbout: '', // short brand description shown in the footer
   privacy: '', // Privacy Policy text (footer)
   poweredBy: 'Rahat Wize', // "Powered by ..." line in the footer
+  apiSecrets: {}, // named API credentials for product auto-delivery: { NAME: 'secret value' } — never sent to the client
   tagline: { bn: 'দ্রুত • নিরাপদ • বিশ্বস্ত', en: 'Fast • Safe • Reliable' },
   currency: '৳',
   referralBonus: 10, // credited to referrer when a referred user's first deposit is approved
