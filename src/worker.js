@@ -234,11 +234,11 @@ async function retryApiQueue(env) {
     if ((order.api.nextTs || 0) > t) continue;
     const svc = services.find((s) => s.id === order.svcId);
     if (!svc || !svc.api || !svc.api.on) { await env.DATA.delete(qk.name); continue; }
-    if (order.api.extId) { order.api.state = 'ok'; if (order.status === 'pending') order.status = 'processing'; await env.DATA.delete(qk.name); await saveOrderStatus(env, okey, order); continue; }
+    if (order.api.extId) { order.api.state = 'ok'; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; await env.DATA.delete(qk.name); await saveOrderStatus(env, okey, order); continue; }
     const res = await runProductApi(order, svc, settings);
     order.api.attempts = (order.api.attempts || 1) + 1;
     order.api.resp = res.resp; order.api.error = res.error || ''; order.api.status = res.status || 0;
-    if (res.ok) { order.api.state = 'ok'; order.api.extId = res.extId || ''; order.status = 'processing'; await env.DATA.delete(qk.name); }
+    if (res.ok) { order.api.state = 'ok'; order.api.extId = res.extId || ''; order.status = svc.api.doneOnOk ? 'done' : 'processing'; await env.DATA.delete(qk.name); }
     else if (!apiRetryable(res) || order.api.attempts >= 8) { order.api.state = 'failed'; await env.DATA.delete(qk.name); }
     else order.api.nextTs = t + backoff[Math.min(order.api.attempts - 1, backoff.length - 1)] * 1000;
     await saveOrderStatus(env, okey, order);
@@ -295,7 +295,7 @@ async function handleApi(req, env, url, path, u, secure) {
       const res = await runProductApi(order, svc, settings);
       const retry = apiRetryable(res);
       order.api = { state: res.ok ? 'ok' : (retry ? 'queued' : 'failed'), extId: res.extId || '', resp: res.resp, error: res.error || '', status: res.status || 0, attempts: 1, nextTs: (res.ok || !retry) ? 0 : ts + 60000 };
-      if (res.ok) order.status = 'processing';
+      if (res.ok) order.status = svc.api.doneOnOk ? 'done' : 'processing';
     }
     await env.DATA.put('u:' + u.id, JSON.stringify(fresh));
     await env.DATA.put(key, JSON.stringify(order), { metadata: orderMeta(order) });
@@ -485,10 +485,10 @@ async function handleAdmin(req, env, url, path, u) {
     const services = await getServices(env); const svc = services.find((s) => s.id === order.svcId);
     if (!svc || !svc.api || !svc.api.on) return json({ ok: false, error: 'noapi' }, 400);
     // safety: if this order already got an external id, it already succeeded — don't call again (avoid double delivery)
-    if (order.api && order.api.extId) { order.api.state = 'ok'; if (order.status === 'pending') order.status = 'processing'; await env.DATA.delete('apiq:' + okey); await saveOrderStatus(env, okey, order); return json({ ok: true, api: order.api, status: order.status, already: true }); }
+    if (order.api && order.api.extId) { order.api.state = 'ok'; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; await env.DATA.delete('apiq:' + okey); await saveOrderStatus(env, okey, order); return json({ ok: true, api: order.api, status: order.status, already: true }); }
     const res = await runProductApi(order, svc, await getSettings(env));
     order.api = order.api || {}; order.api.attempts = (order.api.attempts || 1) + 1; order.api.resp = res.resp; order.api.error = res.error || ''; order.api.status = res.status || 0;
-    if (res.ok) { order.api.state = 'ok'; order.api.extId = res.extId || ''; order.status = 'processing'; await env.DATA.delete('apiq:' + okey); }
+    if (res.ok) { order.api.state = 'ok'; order.api.extId = res.extId || ''; order.status = svc.api.doneOnOk ? 'done' : 'processing'; await env.DATA.delete('apiq:' + okey); }
     else if (apiRetryable(res)) { order.api.state = 'queued'; order.api.nextTs = now() + 60000; await env.DATA.put('apiq:' + okey, '1'); }
     else { order.api.state = 'failed'; await env.DATA.delete('apiq:' + okey); }
     await saveOrderStatus(env, okey, order);
