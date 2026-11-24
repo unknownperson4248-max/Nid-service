@@ -789,11 +789,22 @@ select option{background:#141922;color:var(--lx-ink)}
 .lb-row .ord-main small{display:block;color:var(--lx-sub,#a7a299);font-size:11.5px}
 .lb-amt{flex:none;color:var(--lx-gold);font-size:14px}
 /* order guide box (under the product form) */
-.guide-box{margin-top:14px;background:var(--lx-card,#141418);border:1px solid rgba(232,195,121,.22);border-radius:16px;padding:14px}
-.guide-h{display:flex;align-items:center;gap:7px;font-weight:800;font-family:var(--disp);font-size:14px;color:var(--lx-gold);margin-bottom:10px}
-.guide-h .ic{width:18px;height:18px}
-.guide-img{display:block;width:100%;border-radius:12px;border:1px solid var(--line)}
-.guide-note{font-size:13px;color:var(--lx-sub,#c9c4ba);white-space:pre-line;margin-top:10px;line-height:1.5}
+.guide-box{margin:4px 0 12px;background:rgba(255,255,255,.03);border:1px solid rgba(232,195,121,.22);border-radius:14px;padding:12px}
+.guide-h{display:flex;align-items:center;gap:7px;font-weight:800;font-family:var(--disp);font-size:13px;color:var(--lx-gold);margin-bottom:9px}
+.guide-h .ic{width:17px;height:17px}
+.guide-img{display:block;width:100%;aspect-ratio:3/1;object-fit:cover;border-radius:11px;border:1px solid var(--line)}
+.guide-note{font-size:12.5px;color:var(--lx-sub,#c9c4ba);white-space:pre-line;margin-top:9px;line-height:1.5}
+/* compact option tiles + hero so the order page looks balanced */
+.pk{padding:9px 8px!important;gap:2px!important;min-height:0}
+.pk-l{font-size:13px}
+.pk-p{font-size:12px}
+.pk-note{font-size:10px}
+.pk-grid{grid-template-columns:repeat(auto-fill,minmax(94px,1fr));gap:8px}
+.svc-hero{padding:12px 14px!important;gap:11px;margin-bottom:12px}
+.svc-hero b{font-size:15px}
+.svc-hero small{font-size:11.5px}
+.svc-hero .qs-ic{width:40px!important;height:40px!important}
+.svc-hero .qs-ic .ic{width:21px;height:21px}
 .cat-tab{all:unset;cursor:pointer;white-space:nowrap;font-size:12.5px;font-weight:700;padding:8px 15px;border-radius:999px;color:var(--lx-sub);background:var(--lx-card);border:1px solid var(--lx-line);transition:background .18s,color .18s,transform .12s}
 .cat-tab.on{color:#1a1206;background:var(--gold-g);border-color:transparent;box-shadow:0 10px 20px -10px rgba(201,153,47,.6)}
 .cat-tab:active{transform:scale(.95)}

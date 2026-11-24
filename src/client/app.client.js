@@ -329,10 +329,10 @@
       <div id="ord-err"></div>
       <form id="svc-form" class="card card-pad">
         ${(s.fields || []).map(fieldHtml).join('')}
+        ${(s.guideImg || s.guideNote) ? `<div class="guide-box"><div class="guide-h">${icon('info')}<span>${S.lang === 'en' ? 'How to order' : 'কিভাবে অর্ডার করবেন'}</span></div>${s.guideImg ? `<a href="${esc(s.guideImg)}" target="_blank" rel="noopener"><img class="guide-img" src="${esc(s.guideImg)}" alt=""></a>` : ''}${s.guideNote ? `<div class="guide-note">${esc(s.guideNote)}</div>` : ''}</div>` : ''}
         <div class="total-box"><span class="t">${u('total')}</span><span class="v" id="ord-total">${money(0)}</span></div>
         <button class="btn" type="submit">${icon('check')}${u('orderNow')}</button>
       </form>
-      ${(s.guideImg || s.guideNote) ? `<div class="guide-box"><div class="guide-h">${icon('info')}<span>${S.lang === 'en' ? 'How to order' : 'কিভাবে অর্ডার করবেন'}</span></div>${s.guideImg ? `<a href="${esc(s.guideImg)}" target="_blank" rel="noopener"><img class="guide-img" src="${esc(s.guideImg)}" alt=""></a>` : ''}${s.guideNote ? `<div class="guide-note">${esc(s.guideNote)}</div>` : ''}</div>` : ''}
       <div style="height:10px"></div>`;
     const form = $('#svc-form');
     const recalc = () => { $('#ord-total').textContent = money(calcPrice(s, formVals(form))); };
