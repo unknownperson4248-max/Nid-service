@@ -334,7 +334,7 @@ async function handleApi(req, env, url, path, u, secure) {
   if (path === '/api/deposit' && req.method === 'POST') {
     let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
     const method = clip(b.method, 20), toNumber = clip(b.toNumber, 20), sender = clip(b.sender, 14), trxid = clip(b.trxid, 40), amount = Math.round(toNum(b.amount));
-    if (!method || !PHONE_RE.test(sender) || trxid.length < 4 || !(amount >= (settings.minDeposit || 20) && amount <= 100000))
+    if (!method || trxid.length < 4 || !(amount >= (settings.minDeposit || 20) && amount <= 100000))
       return json({ ok: false, error: 'invalid' }, 400);
     const ts = now(), id = 'DP' + String(ts).slice(-8) + rid(2).toUpperCase();
     const dep = { id, uid: u.id, uname: u.name, method, toNumber, sender, trxid, amount, status: 'pending', ts };
@@ -444,6 +444,24 @@ async function handleGoogle(req, env, url, path, secure) {
 
 async function handleAdmin(req, env, url, path, u) {
   if (!u || u.role !== 'admin') return json({ ok: false, error: 'forbidden' }, 403);
+
+  if (path === '/api/admin/backfill-topup' && req.method === 'POST') {
+    const totals = {}; let cursor;
+    do {
+      const res = await env.DATA.list({ prefix: 'dep:', cursor, limit: 1000 });
+      cursor = res.list_complete ? null : res.cursor;
+      for (const k of res.keys) { const m = k.metadata || {}; if (m.status === 'approved' && m.uid) totals[m.uid] = (totals[m.uid] || 0) + (m.amt || 0); }
+    } while (cursor);
+    let updated = 0; const lb = [];
+    for (const uid of Object.keys(totals)) {
+      const user = await env.DATA.get('u:' + uid, 'json'); if (!user) continue;
+      user.topup = totals[uid]; await env.DATA.put('u:' + uid, JSON.stringify(user)); updated++;
+      if (totals[uid] > 0) lb.push({ uid, name: maskName(user.name || ''), topup: totals[uid] });
+    }
+    lb.sort((a, b) => b.topup - a.topup);
+    await env.DATA.put('lb', JSON.stringify(lb.slice(0, 100)));
+    return json({ ok: true, users: Object.keys(totals).length, updated, leaderboard: lb.length });
+  }
 
   // optional extra "admin panel password" gate
   const aset = await getSettings(env);

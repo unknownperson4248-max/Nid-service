@@ -478,7 +478,6 @@
         <div id="dep-err" style="margin-top:14px"></div>
         <form id="dep-form" class="card card-pad" ${methods.length ? '' : 'hidden'}>
           <input type="hidden" name="method" value=""><input type="hidden" name="toNumber" value=""><input type="hidden" name="amount" value="${amount}">
-          <div class="field"><label>${u('senderNo')} <span class="req">*</span></label><input name="sender" type="tel" inputmode="numeric" maxlength="11" placeholder="01XXXXXXXXX" required></div>
           <div class="field"><label>${u('trxid')} <span class="req">*</span></label><input name="trxid" maxlength="40" placeholder="TrxID" required></div>
           <button class="btn" type="submit">${icon('check')}${u('submit')}</button>
         </form>
@@ -494,7 +493,7 @@
   }
   async function submitDeposit(form) {
     const d = Object.fromEntries(new FormData(form)); const errEl = $('#dep-err');
-    if (!d.method || !/^01\d{9}$/.test(d.sender) || (d.trxid || '').length < 4 || +d.amount < (S.settings.minDeposit || 20)) { errEl.innerHTML = `<div class="err-msg">${u('fillAll')}</div>`; return; }
+    if (!d.method || (d.trxid || '').length < 4 || +d.amount < (S.settings.minDeposit || 20)) { errEl.innerHTML = `<div class="err-msg">${u('fillAll')}</div>`; return; }
     const btn = form.querySelector('.btn'); btn.disabled = true;
     const r = await api('/api/deposit', d); btn.disabled = false;
     if (r.ok) { toast(u('depositSent')); location.hash = '#home'; renderRoute(); }
