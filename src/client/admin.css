@@ -187,3 +187,5 @@ textarea{resize:vertical;min-height:60px}
 .cat-actions .ib{width:30px;height:30px}
 .cat-actions .btn-sm{padding:7px 10px}
 .opt-row{flex-wrap:wrap}
+.topbar-r{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+.topbar-r .btn{margin-left:0}

@@ -878,3 +878,5 @@ select option{background:#141922;color:var(--lx-ink)}
 .hf-power b{color:var(--lx-gold)}
 .doc-body{padding:4px 2px 8px;font-size:13.5px;line-height:1.7;color:var(--lx-sub);white-space:pre-line;max-height:60vh;overflow:auto}
 .pk-note{font-size:10.5px;color:var(--muted);font-weight:500;line-height:1.25;margin-top:1px}
+.admin-ic{color:var(--lx-gold)!important;border-color:rgba(232,195,121,.4)!important;text-decoration:none}
+.admin-ic .ic{color:var(--lx-gold)}

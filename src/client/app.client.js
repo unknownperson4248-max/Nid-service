@@ -23,6 +23,7 @@
     copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>', info: '<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>',
     alert: '<path d="M12 3l9 16H3z"/><path d="M12 9v4M12 17h.01"/>', whatsapp: '<path d="M12 3a9 9 0 0 0-7.7 13.6L3 21l4.5-1.2A9 9 0 1 0 12 3z"/><path d="M8.5 8.5c0 4 3 7 7 7 .6 0 1.2-.5 1.3-1.1.1-.4-.1-.6-.4-.8l-1.6-.8c-.2-.1-.5 0-.6.2l-.5.7c-1.1-.4-2-1.3-2.4-2.4l.7-.5c.2-.1.3-.4.2-.6l-.8-1.6c-.1-.3-.4-.5-.8-.4-.6.1-1.1.7-1.1 1.3z" fill="currentColor" stroke="none"/>',
     lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>', edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+    shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
     refresh: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>', star: '<path d="M12 3l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 18l-5.9 3 1.2-6.5L2.5 9.9 9 9z"/>',
     grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
     tag: '<path d="M3 11l8-8 10 10-8 8z"/><circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"/>', eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
@@ -133,6 +134,7 @@
         <div class="logo">${B.logo ? `<img class="logo-img" src="${esc(B.logo)}" alt="">` : ''}<span class="logo-t">${esc(B.brandA)} <em>${esc(B.brandB)}</em></span></div>
         <div class="top-right">
           <div class="wallet" data-nav="deposit" title="${u('addMoney')}">${icon('wallet')}<span>${money(S.user.balance)}</span></div>
+          ${S.user.role === 'admin' ? `<a class="icon-btn admin-ic" href="/admin" title="Admin panel" aria-label="Admin panel">${icon('shield')}</a>` : ''}
           <button class="avatar" data-nav="profile">${initials(S.user.name)}</button>
         </div>
       </div></header>
@@ -521,7 +523,7 @@
     v.innerHTML = `<div class="ph"><button class="back" data-back>${icon('left')}</button><h2>${u('profile')}</h2></div>
       <div class="card card-pad" style="text-align:center;margin-bottom:14px"><div class="avatar" style="width:72px;height:72px;font-size:26px;margin:0 auto 10px">${initials(S.user.name)}</div>
         <h2 style="font-size:20px">${esc(S.user.name)}</h2><div class="muted">${esc(S.user.phone)}</div>
-        ${S.user.role === 'admin' ? `<a class="btn btn-sm btn-ghost" href="/admin" style="margin-top:12px;display:inline-flex">${icon('lock')}Admin Panel</a>` : ''}</div>
+</div>
       <div class="card"><div class="kv" style="padding:14px 16px"><span class="k">${u('balance')}</span><span class="v">${money(S.user.balance)}</span></div></div>
       <div id="pf-msg"></div>
       <form id="pf-form" class="card card-pad" style="margin-top:14px">

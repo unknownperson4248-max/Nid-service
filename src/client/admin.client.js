@@ -52,9 +52,9 @@
     root.innerHTML = `<div class="wrap">
       <aside class="side ${S.menuOpen ? 'on' : ''}"><div class="brand"><span class="mark">${icon('bolt')}</span><b>WizeFF Admin</b></div>
         <nav>${NAV.map(([group, items]) => `<div class="nav-group">${esc(group)}</div>${items.map(([k, ic, l]) => `<button data-tab="${k}" class="${S.tab === k ? 'on' : ''}">${icon(ic)}<span>${l}</span><span class="count ${k}-count" style="display:none"></span></button>`).join('')}`).join('')}</nav>
-        <div class="foot"><a href="/">${icon('eye')}View site</a><button data-act="logout">${icon('logout')}Logout</button></div></aside>
+        <div class="foot"><button data-act="logout">${icon('logout')}Logout</button></div></aside>
       <div class="side-scrim ${S.menuOpen ? 'on' : ''}" data-act="menu-close"></div>
-      <main class="main"><div class="topbar"><button class="menu-btn" data-act="menu">${icon('menu')}</button><h1 id="title">Dashboard</h1><button class="btn btn-ghost btn-sm refresh" data-act="refresh">${icon('refresh')}Refresh</button></div>
+      <main class="main"><div class="topbar"><button class="menu-btn" data-act="menu">${icon('menu')}</button><h1 id="title">Dashboard</h1><div class="topbar-r"><a class="btn btn-ghost btn-sm" href="/" target="_blank" rel="noopener">${icon('eye')}View site</a><button class="btn btn-ghost btn-sm refresh" data-act="refresh">${icon('refresh')}Refresh</button></div></div>
         <div id="content"><div class="spin"></div></div></main></div>`;
     loadCounts();
   }
@@ -224,21 +224,27 @@
       <div class="qa-row">${[['player', 'FF Player ID', 'bolt'], ['dropdown', 'Dropdown / package', 'grid'], ['image', 'Image upload', 'eye'], ['number', 'Number', 'money'], ['note', 'Note', 'edit'], ['blank', 'Blank box', 'plus']].map(([k, lbl, ic]) => `<button type="button" class="qa" data-qa="${k}">${icon(ic)}${lbl}</button>`).join('')}</div>
       <div id="fields-wrap">${s.fields.map(fieldEditor).join('')}</div>
       <div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px">
-        <label class="flex" style="gap:6px;font-weight:700"><input type="checkbox" id="f-api-on" ${(s.api && s.api.on) ? 'checked' : ''} style="width:auto"> Auto-delivery via API</label>
-        <label class="flex" style="gap:6px;margin:8px 0 2px"><input type="checkbox" id="f-api-done" ${(s.api && s.api.doneOnOk) ? 'checked' : ''} style="width:auto"> Mark order as <b>Done</b> on success (otherwise <b>Processing</b>)</label>
-        <div class="muted" style="font-size:12px;margin:6px 0 10px">When a customer pays, the system calls this API automatically. Use <code>{boxkey}</code> for an order box value, <code>{{SECRET}}</code> for a saved secret (Settings → API). <code>{amount}</code>, <code>{orderId}</code> also work. Leave off to keep this product manual.</div>
-        <div class="flex" style="margin-bottom:10px"><span class="muted" style="font-size:12px">Quick preset:</span><button type="button" class="btn btn-ghost btn-sm" data-apipreset="ffglory">ffglory (Glory)</button><button type="button" class="btn btn-ghost btn-sm" data-apipreset="smm">SMM panel</button></div>
-        <div class="grid2">
-          <div class="field"><label>Method</label><select id="f-api-method">${['POST', 'GET'].map((m) => `<option ${((s.api && s.api.method) || 'POST') === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
-          <div class="field"><label>Response ID path</label><input id="f-api-idpath" value="${esc((s.api && s.api.idPath) || '')}" placeholder="e.g. group_id or order"></div>
+        <label class="flex" style="gap:6px;font-weight:700"><input type="checkbox" id="f-api-on" ${(s.api && s.api.on) ? 'checked' : ''} style="width:auto"> Auto-delivery via API <span class="muted" style="font-weight:500;font-size:12px">(off = manual)</span></label>
+        <div id="f-api-detail" style="${(s.api && s.api.on) ? '' : 'display:none'};margin-top:10px">
+          <div class="flex" style="margin-bottom:10px"><span class="muted" style="font-size:12px">1-click setup:</span><button type="button" class="btn btn-ghost btn-sm" data-apipreset="ffglory">ffglory (Glory)</button><button type="button" class="btn btn-ghost btn-sm" data-apipreset="smm">SMM panel</button></div>
+          <label class="flex" style="gap:6px;margin:0 0 6px"><input type="checkbox" id="f-api-done" ${(s.api && s.api.doneOnOk) ? 'checked' : ''} style="width:auto"> Mark order <b>Done</b> on success (else <b>Processing</b>)</label>
+          <details style="margin-top:6px"><summary class="muted" style="font-size:12px;cursor:pointer">Advanced request settings</summary>
+            <div class="muted" style="font-size:11px;margin:8px 0">Use <code>{boxkey}</code> for an order box value, <code>{{SECRET}}</code> for a saved key (Settings → API keys).</div>
+            <div class="grid2">
+              <div class="field"><label>Method</label><select id="f-api-method">${['POST', 'GET'].map((m) => `<option ${((s.api && s.api.method) || 'POST') === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
+              <div class="field"><label>Response ID path</label><input id="f-api-idpath" value="${esc((s.api && s.api.idPath) || '')}" placeholder="group_id"></div>
+            </div>
+            <div class="field"><label>URL</label><input id="f-api-url" value="${esc((s.api && s.api.url) || '')}" placeholder="https://..."></div>
+            <div class="field"><label>Query params (JSON)</label><input id="f-api-query" value="${esc((s.api && s.api.query) || '')}" placeholder='{"api_key":"{{FFGLORY_KEY}}"}'></div>
+            <div class="field"><label>Headers (JSON)</label><input id="f-api-headers" value="${esc((s.api && s.api.headers) || '')}" placeholder='{"x-api-key":"{{FFGLORY_MKEY}}"}'></div>
+            <div class="field"><label>Body (JSON)</label><textarea id="f-api-body" rows="3" placeholder='{"region":"{region}","clan_id":"{clan_id}"}'>${esc((s.api && s.api.body) || '')}</textarea></div>
+          </details>
         </div>
-        <div class="field"><label>URL</label><input id="f-api-url" value="${esc((s.api && s.api.url) || '')}" placeholder="https://ffglory.pro/api/client/auto-clan-group"></div>
-        <div class="field"><label>Query params (JSON)</label><input id="f-api-query" value="${esc((s.api && s.api.query) || '')}" placeholder='{"api_key":"{{FFGLORY_KEY}}"}'></div>
-        <div class="field"><label>Headers (JSON)</label><input id="f-api-headers" value="${esc((s.api && s.api.headers) || '')}" placeholder='{"x-api-key":"{{FFGLORY_MKEY}}"}'></div>
-        <div class="field"><label>Body (JSON)</label><textarea id="f-api-body" rows="3" placeholder='{"region":"bd","clan_id":"{clan_id}"}'>${esc((s.api && s.api.body) || '')}</textarea></div>
       </div>`,
       `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="svc-save">${icon('check')}Save product</button>`);
     $('#svc-save').addEventListener('click', saveService);
+    const apiOn = $('#f-api-on'); const apiDetail = $('#f-api-detail');
+    if (apiOn && apiDetail) apiOn.addEventListener('change', () => { apiDetail.style.display = apiOn.checked ? '' : 'none'; });
     document.querySelectorAll('[data-apipreset]').forEach((bb) => bb.addEventListener('click', () => {
       readFieldsFromDom(); syncSvcText();
       editing.fields = editing.fields || [];
