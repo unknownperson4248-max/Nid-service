@@ -148,7 +148,7 @@
     const uncat = S.services.filter((s) => !cats.some((x) => x.id === (s.cat || '')));
     c.innerHTML = `<div class="flex" style="margin-bottom:14px;flex-wrap:wrap">
         <button class="btn" data-act="new-svc">${icon('plus')}New product</button>
-        <button class="btn btn-ghost" data-act="edit-cats">${icon('tag')}Categories</button>
+        <button class="btn btn-ghost" data-act="new-cat">${icon('plus')}Add category</button>
         <span class="muted">${S.services.length} products in ${cats.length} categories</span>
       </div>
       <div id="svc-tree">
@@ -164,7 +164,13 @@
         <button type="button" class="ib cat-chev">${icon('down')}</button>
         <b>${esc(tl(cat.name))}</b>
         <span class="pill">${products.length}</span>
-        ${cat.id !== '__none' ? `<button type="button" class="btn btn-ghost btn-sm" data-add-prod="${esc(cat.id)}" style="margin-left:auto">${icon('plus')}Add product</button>` : ''}
+        ${cat.id !== '__none' ? `<div class="cat-actions">
+          <button type="button" class="btn btn-ghost btn-sm" data-add-prod="${esc(cat.id)}">${icon('plus')}Add product</button>
+          <button type="button" class="ib" data-move-cat="${esc(cat.id)}:up" title="Move up">${icon('up')}</button>
+          <button type="button" class="ib" data-move-cat="${esc(cat.id)}:down" title="Move down">${icon('down')}</button>
+          <button type="button" class="ib" data-edit-cat="${esc(cat.id)}" title="Edit category">${icon('edit')}</button>
+          <button type="button" class="ib" data-del-cat="${esc(cat.id)}" title="Delete category" style="color:var(--bad)">${icon('trash')}</button>
+        </div>` : ''}
       </div>
       <div class="cat-body" ${open ? '' : 'hidden'}>
         ${products.map((s) => prodRow(s)).join('') || `<div class="empty" style="padding:18px">No products yet</div>`}
@@ -304,15 +310,21 @@
   }
 
   /* ---------- categories ---------- */
-  function editCats() {
-    modal('Categories', `<div id="cats-wrap">${S.cats.map(catRow).join('')}</div><button class="btn btn-ghost btn-sm" data-act="add-cat">${icon('plus')}Add category</button>`,
-      `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="cats-save">${icon('check')}Save</button>`);
-    $('#cats-save').addEventListener('click', async () => {
-      const cats = [...document.querySelectorAll('[data-cat]')].map((el) => { const nm = el.querySelector('[data-cname]').value.trim(); return { id: el.querySelector('[data-ck]').value.trim() || nm.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'c' + Math.random().toString(36).slice(2, 6), name: nm }; }).filter((c) => c.name);
-      const r = await api('/api/admin/cats', { cats }); if (r.ok) { S.cats = cats; toast('Saved'); closeModal(); vServices(); } else toast('Error');
+  async function saveCats(cats) { const r = await api('/api/admin/cats', { cats }); if (r.ok) { S.cats = cats; return true; } toast('Error'); return false; }
+  function catModal(cat) {
+    const isNew = !cat; const c0 = cat || { id: '', name: '' };
+    modal(isNew ? 'Add category' : 'Edit category', `
+      <div class="field"><label>Category name <span class="req">*</span></label><input id="c-name" value="${esc(tl(c0.name))}" placeholder="e.g. গেম টপ-আপ"></div>
+      <div class="field"><label>ID / link (english) <span class="hint">(auto if empty)</span></label><input id="c-id" value="${esc(c0.id)}" placeholder="auto" ${isNew ? '' : 'readonly'}><div class="muted" style="font-size:11px;margin-top:4px">${isNew ? 'Used internally; cannot change later.' : 'ID cannot be changed.'}</div></div>`,
+      `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="c-save">${icon('check')}${isNew ? 'Create' : 'Save'}</button>`);
+    $('#c-save').addEventListener('click', async () => {
+      const nm = $('#c-name').value.trim(); if (!nm) { toast('Enter a category name'); return; }
+      const cats = S.cats.map((x) => ({ ...x }));
+      if (!isNew) { const ex = cats.find((x) => x.id === c0.id); if (ex) ex.name = nm; }
+      else { let id = ($('#c-id').value.trim() || nm.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')) || 'c' + Math.random().toString(36).slice(2, 6); while (cats.some((x) => x.id === id)) id += Math.random().toString(36).slice(2, 3); cats.push({ id, name: nm, order: cats.length }); }
+      if (await saveCats(cats)) { toast(isNew ? 'Category added ✓' : 'Saved ✓'); closeModal(); vServices(); }
     });
   }
-  const catRow = (c) => `<div class="fieldrow" data-cat><div class="grid2"><div class="field"><label>Category name</label><input data-cname value="${esc(tl(c.name))}" placeholder="e.g. Game Top-Up"></div><div class="field"><label>ID (english)</label><input data-ck value="${esc(c.id)}" placeholder="auto"></div></div></div>`;
 
   /* ---------- users ---------- */
   let userFilter = '', allUsers = [];
@@ -609,6 +621,10 @@
     const dno = e.target.closest('[data-dep-no]'); if (dno) { if (confirm('Reject this deposit?')) { const r = await api('/api/admin/deposit', { key: dno.dataset.depNo, status: 'rejected' }); if (r.ok) { toast('Rejected'); vDeposits(); loadCounts(); } } return; }
     if (e.target.closest('[data-act="new-svc"]')) { newService(); return; }
     const addProd = e.target.closest('[data-add-prod]'); if (addProd) { newService(addProd.dataset.addProd === '__none' ? '' : addProd.dataset.addProd); return; }
+    if (e.target.closest('[data-act="new-cat"]')) { catModal(null); return; }
+    const editCat = e.target.closest('[data-edit-cat]'); if (editCat) { const cat = S.cats.find((x) => x.id === editCat.dataset.editCat); if (cat) catModal(cat); return; }
+    const delCat = e.target.closest('[data-del-cat]'); if (delCat) { const id = delCat.dataset.delCat; const has = S.services.some((s) => (s.cat || '') === id); if (confirm(has ? 'Delete this category? Its products will move to Uncategorized.' : 'Delete this category?')) { const cats = S.cats.filter((x) => x.id !== id); if (await saveCats(cats)) { toast('Category deleted'); vServices(); } } return; }
+    const moveCat = e.target.closest('[data-move-cat]'); if (moveCat) { const [id, dir] = moveCat.dataset.moveCat.split(':'); const cats = S.cats.slice().sort((a, b) => (a.order || 0) - (b.order || 0)); const idx = cats.findIndex((x) => x.id === id); const sw = dir === 'up' ? idx - 1 : idx + 1; if (idx < 0 || sw < 0 || sw >= cats.length) return; cats.forEach((x, i) => { x.order = i; }); const t = cats[idx].order; cats[idx].order = cats[sw].order; cats[sw].order = t; if (await saveCats(cats)) { toast('Moved'); vServices(); } return; }
     const catTog = e.target.closest('[data-cat-toggle]'); if (catTog) { const id = catTog.dataset.catToggle; catOpen[id] = catOpen[id] === false; renderServiceTree(); return; }
     const toggleSvc = e.target.closest('[data-toggle-svc]'); if (toggleSvc) { const s = S.services.find((x) => x.id === toggleSvc.dataset.toggleSvc); if (s) { s.active = toggleSvc.checked; await saveServiceList(S.services); } return; }
     const moveSvc = e.target.closest('[data-move-svc]'); if (moveSvc) {
@@ -619,7 +635,6 @@
       siblings.forEach((x, i) => { x.order = i; }); const tmp = siblings[idx].order; siblings[idx].order = siblings[swapIdx].order; siblings[swapIdx].order = tmp;
       await saveServiceList(S.services); renderServiceTree(); return;
     }
-    if (e.target.closest('[data-act="edit-cats"]')) { editCats(); return; }
     const es = e.target.closest('[data-edit-svc]'); if (es) { editService(es.dataset.editSvc); return; }
     const ds = e.target.closest('[data-del-svc]'); if (ds) { if (confirm('Delete this product?')) { const list = S.services.filter((x) => x.id !== ds.dataset.delSvc); if (await saveServiceList(list)) { toast('Deleted'); renderServiceTree(); } } return; }
     if (e.target.closest('[data-act="add-field"]')) { readFieldsFromDom(); editing.fields.push({ key: '', type: 'text', required: false, label: '' }); $('#fields-wrap').innerHTML = editing.fields.map(fieldEditor).join(''); return; }
@@ -637,7 +652,6 @@
     const delF = e.target.closest('[data-del-field]'); if (delF) { readFieldsFromDom(); editing.fields.splice(+delF.dataset.delField, 1); $('#fields-wrap').innerHTML = editing.fields.map(fieldEditor).join(''); return; }
     const addOpt = e.target.closest('[data-add-opt]'); if (addOpt) { readFieldsFromDom(); const fi = +addOpt.dataset.addOpt; editing.fields[fi].options = editing.fields[fi].options || []; editing.fields[fi].options.push({ label: '', price: undefined }); $('#fields-wrap').innerHTML = editing.fields.map(fieldEditor).join(''); return; }
     const delOpt = e.target.closest('[data-del-opt]'); if (delOpt) { readFieldsFromDom(); const [fi, oi] = delOpt.dataset.delOpt.split(':'); editing.fields[+fi].options.splice(+oi, 1); $('#fields-wrap').innerHTML = editing.fields.map(fieldEditor).join(''); return; }
-    if (e.target.closest('[data-act="add-cat"]')) { const w = $('#cats-wrap'); const div = document.createElement('div'); div.innerHTML = catRow({ id: '', name: { bn: '', en: '' } }); w.appendChild(div.firstChild); return; }
     const user = e.target.closest('[data-user]'); if (user) { try { userModal(JSON.parse(user.dataset.user)); } catch (x) {} return; }
     if (e.target.closest('[data-act="add-notice"]')) { saveNotices(); notices.unshift({ id: 'n' + Date.now(), type: 'info', ts: Date.now(), title: '', body: '' }); const nl = $('#nlist'); if (nl) nl.innerHTML = renderNotices(); saveNoticesToServer(); return; }
     const delN = e.target.closest('[data-del-notice]'); if (delN) { saveNotices(); notices.splice(+delN.dataset.delNotice, 1); $('#nlist').innerHTML = renderNotices(); saveNoticesToServer(); return; }

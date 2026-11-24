@@ -179,3 +179,10 @@ textarea{resize:vertical;min-height:60px}
 /* grouped sidebar sections */
 .nav-group{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#64748b;padding:15px 12px 5px}
 .side nav > .nav-group:first-child{padding-top:4px}
+
+/* category header actions (edit/delete/move per category) */
+.cat-head{flex-wrap:wrap}
+.cat-head b{flex:1 1 auto;min-width:0}
+.cat-actions{display:flex;align-items:center;gap:2px;margin-left:auto;flex:none}
+.cat-actions .ib{width:30px;height:30px}
+.cat-actions .btn-sm{padding:7px 10px}
