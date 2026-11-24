@@ -89,7 +89,7 @@ async function userFromReq(req, env) {
   u._token = m[1];
   return u;
 }
-const pubUser = (u) => ({ id: u.id, name: u.name, phone: u.phone || '', email: u.email || '', balance: u.balance || 0, role: u.role || 'user', ref: u.ref, ts: u.ts });
+const pubUser = (u) => ({ id: u.id, name: u.name, phone: u.phone || '', email: u.email || '', balance: u.balance || 0, topup: u.topup || 0, role: u.role || 'user', ref: u.ref, ts: u.ts });
 
 async function handleAuth(req, env, url, path, secure) {
   const ip = req.headers.get('cf-connecting-ip') || 'x';
@@ -356,6 +356,12 @@ async function handleApi(req, env, url, path, u, secure) {
     return json({ ok: true, ref: u.ref, count: refd.count, earned: refd.earned, bonus: settings.referralBonus });
   }
 
+  if (path === '/api/leaderboard') {
+    const lb = (await env.DATA.get('lb', 'json')) || [];
+    let rank = 0; if (u) { const idx = lb.findIndex((x) => x.uid === u.id); rank = idx >= 0 ? idx + 1 : 0; }
+    return json({ ok: true, items: lb.slice(0, 15).map((x) => ({ name: x.name, topup: x.topup || 0 })), me: { rank, topup: (u && u.topup) || 0 } });
+  }
+
   if (path === '/api/profile' && req.method === 'POST') {
     let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
     const fresh = await env.DATA.get('u:' + u.id, 'json');
@@ -547,7 +553,9 @@ async function handleAdmin(req, env, url, path, u) {
       const owner = await env.DATA.get('u:' + d.uid, 'json');
       if (owner) {
         owner.balance = Math.round((owner.balance || 0) + d.amount);
+        owner.topup = Math.round((owner.topup || 0) + d.amount);
         await env.DATA.put('u:' + owner.id, JSON.stringify(owner));
+        await bumpLeaderboard(env, owner);
         // referral bonus on first approved deposit
         if (owner.refBy && !owner.firstDepositDone) {
           owner.firstDepositDone = true; await env.DATA.put('u:' + owner.id, JSON.stringify(owner));
@@ -684,6 +692,15 @@ async function syncUserDeposit(env, d) {
   const dl = (await env.DATA.get('udep:' + d.uid, 'json')) || [];
   const i = dl.findIndex((x) => x.id === d.id);
   if (i >= 0) { dl[i].status = d.status; await env.DATA.put('udep:' + d.uid, JSON.stringify(dl)); }
+}
+
+async function bumpLeaderboard(env, owner) {
+  const lb = (await env.DATA.get('lb', 'json')) || [];
+  const entry = { uid: owner.id, name: maskName(owner.name || ''), topup: owner.topup || 0 };
+  const i = lb.findIndex((x) => x.uid === owner.id);
+  if (i >= 0) lb[i] = entry; else lb.push(entry);
+  lb.sort((a, b) => (b.topup || 0) - (a.topup || 0));
+  await env.DATA.put('lb', JSON.stringify(lb.slice(0, 100)));
 }
 
 

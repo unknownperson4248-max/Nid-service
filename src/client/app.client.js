@@ -36,7 +36,7 @@
     orders: { bn: 'অর্ডার', en: 'Orders' }, referrals: { bn: 'রেফারেল', en: 'Referrals' }, profile: { bn: 'প্রোফাইল', en: 'Profile' },
     transactions: { bn: 'লেনদেন', en: 'Transactions' }, allCats: { bn: 'সব', en: 'All' }, txnHistory: { bn: 'ট্রানজেকশন হিস্টোরি', en: 'Transaction history' }, rules: { bn: 'নিয়ম ও শর্তাবলী', en: 'Rules & Regulations' }, cancelOrder: { bn: 'অর্ডার বাতিল ও রিফান্ড', en: 'Cancel order & refund' },
     home: { bn: 'হোম', en: 'Home' }, services: { bn: 'সার্ভিস', en: 'Services' }, balance: { bn: 'ব্যালেন্স', en: 'Balance' },
-    walletBalance: { bn: 'ওয়ালেট ব্যালেন্স', en: 'Wallet Balance' }, quickServices: { bn: 'কুইক সার্ভিস', en: 'Quick Services' },
+    walletBalance: { bn: 'ওয়ালেট ব্যালেন্স', en: 'Wallet Balance' }, quickServices: { bn: 'জনপ্রিয় সার্ভিস', en: 'Popular Now' },
     priceList: { bn: 'মূল্য তালিকা', en: 'Price List' }, recentOrders: { bn: 'সাম্প্রতিক অর্ডার', en: 'Recent Orders' },
     noticeBoard: { bn: 'নোটিশ বোর্ড', en: 'Notice Board' }, allServices: { bn: 'সকল সার্ভিস', en: 'All Services' },
     orderHistory: { bn: 'অর্ডার হিস্টোরি', en: 'Order History' }, orderNow: { bn: 'অর্ডার করুন', en: 'Order Now' },
@@ -69,6 +69,17 @@
   const L = (g, k) => !(S.settings && S.settings.layout && S.settings.layout[g] && S.settings.layout[g][k] === false);
   const money = (n) => `${(S.settings && S.settings.currency) || '৳'}${Math.round(+n || 0).toLocaleString('en-US')}`;
   const initials = (n) => String(n || '?').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  const LEVELS = [
+    { n: 'Starter', b: '🌱', min: 0, ring: 'linear-gradient(135deg,#9aa6b2,#636d78)' },
+    { n: 'Bronze', b: '🥉', min: 1000, ring: 'linear-gradient(135deg,#eaa266,#b5692a)' },
+    { n: 'Silver', b: '🥈', min: 5000, ring: 'linear-gradient(135deg,#eef0f3,#9aa1ab)' },
+    { n: 'Gold', b: '🥇', min: 15000, ring: 'linear-gradient(135deg,#f7da85,#c99a3b)' },
+    { n: 'Platinum', b: '💠', min: 40000, ring: 'linear-gradient(135deg,#8fe0fb,#2bb6ef)' },
+    { n: 'Diamond', b: '💎', min: 100000, ring: 'linear-gradient(135deg,#c9b8ff,#8b5cf6)' },
+    { n: 'Legend', b: '👑', min: 250000, ring: 'linear-gradient(135deg,#ffd27a,#ef4444)' },
+  ];
+  function levelOf(tp) { tp = Number(tp) || 0; let i = 0; for (let k = 0; k < LEVELS.length; k++) if (tp >= LEVELS[k].min) i = k; const cur = LEVELS[i]; const next = LEVELS[i + 1] || null; return { i, name: cur.n, badge: cur.b, ring: cur.ring, min: cur.min, next, pct: next ? Math.max(5, Math.min(100, Math.round((tp - cur.min) / (next.min - cur.min) * 100))) : 100, remain: next ? Math.max(0, next.min - tp) : 0 }; }
+  function framedAvatar(name, tp, size) { const L = levelOf(tp); const s = size || 40; return `<span class="av-frame" style="background:${L.ring};width:${s + 6}px;height:${s + 6}px" title="${esc(L.name)}"><span class="avatar" style="width:${s}px;height:${s}px;font-size:${Math.round(s * 0.38)}px">${initials(name)}</span><span class="av-badge" style="font-size:${Math.round(s * 0.36)}px">${L.badge}</span></span>`; }
   const ago = (ts) => { const s = Math.floor((Date.now() - ts) / 1000); if (s < 60) return S.lang === 'en' ? 'just now' : 'এইমাত্র'; const m = Math.floor(s / 60); if (m < 60) return m + (S.lang === 'en' ? ' min ago' : ' মিনিট আগে'); const h = Math.floor(m / 60); if (h < 24) return h + (S.lang === 'en' ? ' hr ago' : ' ঘণ্টা আগে'); return Math.floor(h / 24) + (S.lang === 'en' ? ' d ago' : ' দিন আগে'); };
 
   async function api(path, body, method) {
@@ -135,7 +146,7 @@
         <div class="top-right">
           <div class="wallet" data-nav="deposit" title="${u('addMoney')}">${icon('wallet')}<span>${money(S.user.balance)}</span></div>
           ${S.user.role === 'admin' ? `<a class="icon-btn admin-ic" href="/admin" title="Admin panel" aria-label="Admin panel">${icon('shield')}</a>` : ''}
-          <button class="avatar" data-nav="profile">${initials(S.user.name)}</button>
+          ${(() => { const L = levelOf(S.user.topup); return `<button class="av-frame" data-nav="profile" style="background:${L.ring}" title="${esc(L.name)} • ${money(S.user.topup)}"><span class="avatar">${initials(S.user.name)}</span><span class="av-badge">${L.badge}</span></button>`; })()}
         </div>
       </div></header>
       <main class="wrap page" id="view"></main>
@@ -494,13 +505,31 @@
   async function viewTransactions(v) {
     const en = S.lang === 'en';
     v.innerHTML = `<div class="ph"><button class="back" data-back>${icon('left')}</button><h2>${u('transactions')}</h2></div>
+      <div id="rank-wrap"></div>
       <div class="txn-bal"><div class="txn-bal-t"><span>${u('walletBalance')}</span><b>${money(S.user.balance)}</b></div>
         <button class="txn-add" data-nav="deposit">${icon('plus')}<span>${u('addMoney')}</span></button></div>
+      <div id="lb-wrap"></div>
       <div id="ref-wrap"></div>
       <div class="sec-h">${icon('clock')}${u('txnHistory')}</div>
       <div class="card" id="txn-list"><div class="spin"></div></div><div style="height:10px"></div>`;
-    const [rf, dr] = await Promise.all([api('/api/referrals'), api('/api/deposits')]);
+    const [rf, dr, lb] = await Promise.all([api('/api/referrals'), api('/api/deposits'), api('/api/leaderboard')]);
     if (S.route !== 'transactions') return;
+    const rkw = $('#rank-wrap');
+    if (rkw) {
+      const L = levelOf(S.user.topup); const myRank = (lb && lb.me && lb.me.rank) || 0;
+      rkw.innerHTML = `<div class="rank-card">
+        <div class="rank-top">${framedAvatar(S.user.name, S.user.topup, 56)}
+          <div class="rank-meta"><div class="rank-name">${L.badge} ${L.name}${myRank ? `<span class="rank-no">#${myRank}</span>` : ''}</div>
+            <div class="rank-sub">${en ? 'Total top-up' : 'মোট টপ-আপ'}: <b>${money(S.user.topup)}</b></div></div></div>
+        ${L.next
+          ? `<div class="rank-bar"><i style="width:${L.pct}%"></i></div><div class="rank-next">${money(L.remain)} ${en ? 'more to' : 'আরও দিলে'} ${L.next.b} ${L.next.n}</div>`
+          : `<div class="rank-next">${en ? 'Max level reached' : 'সর্বোচ্চ লেভেল'} 🎉</div>`}</div>`;
+    }
+    const lw = $('#lb-wrap');
+    if (lw && lb && lb.items && lb.items.length) {
+      lw.innerHTML = `<div class="sec-h">${icon('bolt')}${en ? 'Top rankings' : 'টপ র‍্যাংকিং'}</div>
+        <div class="card lb-card">${lb.items.map((x, idx) => { const L = levelOf(x.topup); return `<div class="lb-row"><span class="lb-rank r${idx + 1}">${idx + 1}</span><span class="ord-main"><b>${esc(x.name)}</b><small>${L.badge} ${L.name}</small></span><b class="lb-amt">${money(x.topup)}</b></div>`; }).join('')}</div>`;
+    }
     const rw = $('#ref-wrap');
     if (rw && rf && rf.ok) {
       const link = location.origin + '/?ref=' + (rf.ref || '');
@@ -521,8 +550,9 @@
   /* ---------- profile ---------- */
   function viewProfile(v) {
     v.innerHTML = `<div class="ph"><button class="back" data-back>${icon('left')}</button><h2>${u('profile')}</h2></div>
-      <div class="card card-pad" style="text-align:center;margin-bottom:14px"><div class="avatar" style="width:72px;height:72px;font-size:26px;margin:0 auto 10px">${initials(S.user.name)}</div>
-        <h2 style="font-size:20px">${esc(S.user.name)}</h2><div class="muted">${esc(S.user.phone)}</div>
+      <div class="card card-pad" style="text-align:center;margin-bottom:14px">${framedAvatar(S.user.name, S.user.topup, 72)}
+        <h2 style="font-size:20px;margin-top:10px">${esc(S.user.name)}</h2><div class="muted">${esc(S.user.phone)}</div>
+        ${(() => { const L = levelOf(S.user.topup); return `<div class="lvl-chip">${L.badge} ${L.name}</div>`; })()}
 </div>
       <div class="card"><div class="kv" style="padding:14px 16px"><span class="k">${u('balance')}</span><span class="v">${money(S.user.balance)}</span></div></div>
       <div id="pf-msg"></div>
