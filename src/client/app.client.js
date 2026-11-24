@@ -277,7 +277,7 @@
   const qsCard = (s) => `<button class="qs" data-nav="service/${esc(s.id)}" style="--c:${svcColor(s)}">
     ${s.featured ? `<span class="qs-badge">HOT</span>` : ''}
     <span class="qs-art">${s.image ? `<img src="${esc(s.image)}" alt="" loading="lazy">` : `<span class="qs-ic">${icon(s.icon || 'bolt')}</span>`}</span>
-    <span class="qs-lbl"><b>${esc(t(s.name))}</b><span class="from">${u('from')} ${money(svcMinPrice(s))}</span></span></button>`;
+    <span class="qs-lbl"><b>${esc(t(s.name))}</b></span></button>`;
   const svcHasVariable = (s) => (s.fields || []).some((f) => (f.type === 'select' && (f.options || []).some((o) => typeof o.price === 'number')) || (f.type === 'number' && f.priceFromValue));
   function svcMinPrice(s) {
     let base = +s.price || 0; const prices = [];
