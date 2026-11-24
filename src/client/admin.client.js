@@ -212,6 +212,7 @@
       <div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px">
         <label class="flex" style="gap:6px;font-weight:700"><input type="checkbox" id="f-api-on" ${(s.api && s.api.on) ? 'checked' : ''} style="width:auto"> Auto-delivery via API</label>
         <div class="muted" style="font-size:12px;margin:6px 0 10px">When a customer pays, the system calls this API automatically. Use <code>{boxkey}</code> for an order box value, <code>{{SECRET}}</code> for a saved secret (Settings → API). <code>{amount}</code>, <code>{orderId}</code> also work. Leave off to keep this product manual.</div>
+        <div class="flex" style="margin-bottom:10px"><span class="muted" style="font-size:12px">Quick preset:</span><button type="button" class="btn btn-ghost btn-sm" data-apipreset="ffglory">ffglory (Glory)</button><button type="button" class="btn btn-ghost btn-sm" data-apipreset="smm">SMM panel</button></div>
         <div class="grid2">
           <div class="field"><label>Method</label><select id="f-api-method">${['POST', 'GET'].map((m) => `<option ${((s.api && s.api.method) || 'POST') === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
           <div class="field"><label>Response ID path</label><input id="f-api-idpath" value="${esc((s.api && s.api.idPath) || '')}" placeholder="e.g. group_id or order"></div>
@@ -223,6 +224,21 @@
       </div>`,
       `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="svc-save">${icon('check')}Save product</button>`);
     $('#svc-save').addEventListener('click', saveService);
+    document.querySelectorAll('[data-apipreset]').forEach((bb) => bb.addEventListener('click', () => {
+      const set = (id, v) => { const el = $(id); if (el) el.value = v; };
+      $('#f-api-on').checked = true;
+      if (bb.dataset.apipreset === 'ffglory') {
+        set('#f-api-method', 'POST'); set('#f-api-url', 'https://ffglory.pro/api/client/auto-clan-group');
+        set('#f-api-query', '{"api_key":"{{FFGLORY_KEY}}"}'); set('#f-api-headers', '{"x-api-key":"{{FFGLORY_MKEY}}"}');
+        set('#f-api-body', '{"region":"bd","clan_id":"{clan_id}"}'); set('#f-api-idpath', 'group_id');
+        toast('ffglory preset filled — needs a box with key "clan_id"');
+      } else {
+        set('#f-api-method', 'POST'); set('#f-api-url', 'https://YOUR-SMM-PANEL.com/api/v2');
+        set('#f-api-query', ''); set('#f-api-headers', '');
+        set('#f-api-body', '{"key":"{{SMM_KEY}}","action":"add","service":"SERVICE_ID","link":"{link}","quantity":"{quantity}"}'); set('#f-api-idpath', 'order');
+        toast('SMM preset filled — edit URL + SERVICE_ID, boxes: link, quantity');
+      }
+    }));
     $('#f-imgbtn').addEventListener('click', () => $('#f-imgfile').click());
     $('#f-imgfile').addEventListener('change', uploadImage);
     const del = $('#f-imgdel'); if (del) del.addEventListener('click', () => { readFieldsFromDom(); syncSvcText(); editing.image = ''; svcModal(); });
