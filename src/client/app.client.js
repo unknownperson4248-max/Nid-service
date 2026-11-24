@@ -352,7 +352,7 @@
     const lbl = `<label>${esc(t(f.label))} ${f.required ? '<span class="req">*</span>' : ''}</label>`;
     if (f.type === 'select') return `<div class="field">${lbl}
       <input type="hidden" name="${esc(f.key)}" value="">
-      <div class="pk-grid" data-pkg="${esc(f.key)}">${(f.options || []).map((o) => `<button type="button" class="pk" data-pk="${esc(f.key)}" data-v="${esc(o.label)}"><span class="pk-l">${esc(o.label)}</span>${typeof o.price === 'number' ? `<span class="pk-p">${money(o.price)}</span>` : ''}</button>`).join('')}</div></div>`;
+      <div class="pk-grid" data-pkg="${esc(f.key)}">${(f.options || []).map((o) => `<button type="button" class="pk" data-pk="${esc(f.key)}" data-v="${esc(o.value || o.label)}"><span class="pk-l">${esc(o.label)}</span>${typeof o.price === 'number' ? `<span class="pk-p">${money(o.price)}</span>` : ''}</button>`).join('')}</div></div>`;
     if (f.type === 'textarea') return `<div class="field">${lbl}<textarea name="${esc(f.key)}" ${f.required ? 'required' : ''} maxlength="500" placeholder="${esc(f.ph || '')}"></textarea></div>`;
     if (f.type === 'image') return `<div class="field">${lbl}
       <input type="hidden" name="${esc(f.key)}" value="">
@@ -368,7 +368,7 @@
     let a = +s.price || 0;
     (s.fields || []).forEach((f) => {
       const val = vals[f.key];
-      if (f.type === 'select' && val) { const o = (f.options || []).find((x) => x.label === val); if (o && typeof o.price === 'number') a += o.price; }
+      if (f.type === 'select' && val) { const o = (f.options || []).find((x) => (x.value || x.label) === val); if (o && typeof o.price === 'number') a += o.price; }
       if (f.type === 'number' && f.priceFromValue && val) { const n = +val; if (Number.isFinite(n)) a += n; }
       if (typeof f.price === 'number' && f.price > 0 && val) a += f.price;
     });

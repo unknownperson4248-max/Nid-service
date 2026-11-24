@@ -148,9 +148,9 @@ function computeOrder(svc, fields) {
     const v = fields[f.key];
     if (v == null || v === '') { if (f.required) return { error: f.key }; clean[f.key] = ''; continue; }
     if (f.type === 'select') {
-      const opt = (f.options || []).find((o) => o.label === v);
+      const opt = (f.options || []).find((o) => (o.value || o.label) === v);
       if (!opt) return { error: f.key };
-      clean[f.key] = opt.label;
+      clean[f.key] = opt.value || opt.label;
       if (typeof opt.price === 'number') amount += opt.price;
     } else if (f.type === 'number') {
       const n = toNum(v);

@@ -225,19 +225,20 @@
       `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="svc-save">${icon('check')}Save product</button>`);
     $('#svc-save').addEventListener('click', saveService);
     document.querySelectorAll('[data-apipreset]').forEach((bb) => bb.addEventListener('click', () => {
-      const set = (id, v) => { const el = $(id); if (el) el.value = v; };
-      $('#f-api-on').checked = true;
+      readFieldsFromDom(); syncSvcText();
+      editing.fields = editing.fields || [];
       if (bb.dataset.apipreset === 'ffglory') {
-        set('#f-api-method', 'POST'); set('#f-api-url', 'https://ffglory.pro/api/client/auto-clan-group');
-        set('#f-api-query', '{"api_key":"{{FFGLORY_KEY}}"}'); set('#f-api-headers', '{"x-api-key":"{{FFGLORY_MKEY}}"}');
-        set('#f-api-body', '{"region":"bd","clan_id":"{clan_id}"}'); set('#f-api-idpath', 'group_id');
-        toast('ffglory preset filled — needs a box with key "clan_id"');
+        editing.api = { on: true, method: 'POST', url: 'https://ffglory.pro/api/client/auto-clan-group', query: '{"api_key":"{{FFGLORY_KEY}}"}', headers: '{"x-api-key":"{{FFGLORY_MKEY}}"}', body: '{"region":"{region}","clan_id":"{clan_id}"}', idPath: 'group_id' };
+        if (!editing.fields.some((f) => f.key === 'region')) editing.fields.unshift({ key: 'region', type: 'select', required: true, label: { bn: 'রিজন নির্বাচন করুন', en: 'Region' }, options: [{ label: '🇧🇩 বাংলাদেশ', value: 'bd' }, { label: '🌍 Middle East', value: 'me' }] });
+        if (!editing.fields.some((f) => f.key === 'clan_id')) editing.fields.push({ key: 'clan_id', type: 'text', required: true, label: { bn: 'ক্লান আইডি (UID)', en: 'Clan ID' }, ph: '123456789' });
+        toast('ffglory ready ✓ region + Clan ID boxes added');
       } else {
-        set('#f-api-method', 'POST'); set('#f-api-url', 'https://YOUR-SMM-PANEL.com/api/v2');
-        set('#f-api-query', ''); set('#f-api-headers', '');
-        set('#f-api-body', '{"key":"{{SMM_KEY}}","action":"add","service":"SERVICE_ID","link":"{link}","quantity":"{quantity}"}'); set('#f-api-idpath', 'order');
-        toast('SMM preset filled — edit URL + SERVICE_ID, boxes: link, quantity');
+        editing.api = { on: true, method: 'POST', url: 'https://YOUR-SMM-PANEL.com/api/v2', query: '', headers: '', body: '{"key":"{{SMM_KEY}}","action":"add","service":"SERVICE_ID","link":"{link}","quantity":"{quantity}"}', idPath: 'order' };
+        if (!editing.fields.some((f) => f.key === 'link')) editing.fields.push({ key: 'link', type: 'text', required: true, label: { bn: 'লিংক', en: 'Link' }, ph: 'https://...' });
+        if (!editing.fields.some((f) => f.key === 'quantity')) editing.fields.push({ key: 'quantity', type: 'number', required: true, label: { bn: 'পরিমাণ', en: 'Quantity' }, min: 1 });
+        toast('SMM preset ✓ edit URL + SERVICE_ID');
       }
+      svcModal();
     }));
     $('#f-imgbtn').addEventListener('click', () => $('#f-imgfile').click());
     $('#f-imgfile').addEventListener('change', uploadImage);
@@ -268,7 +269,7 @@
       ${f.type === 'select' ? `<div><div class="muted" style="font-size:12px;margin:4px 0">Options (label + price; empty price = no charge)</div><div data-opts="${i}">${(f.options || []).map((o, oi) => optRow(i, oi, o)).join('')}</div><button class="btn btn-ghost btn-sm" data-add-opt="${i}">${icon('plus')}Add option</button></div>` : ''}
     </div>`;
   }
-  const optRow = (fi, oi, o) => `<div class="opt-row" data-opt="${fi}:${oi}"><input data-fo="${fi}:${oi}:label" placeholder="label e.g. 100 💎" value="${esc(o.label || '')}"><input data-fo="${fi}:${oi}:price" type="number" placeholder="price" value="${o.price != null ? o.price : ''}" style="max-width:110px"><button class="btn btn-bad btn-sm" data-del-opt="${fi}:${oi}">${icon('x')}</button></div>`;
+  const optRow = (fi, oi, o) => `<div class="opt-row" data-opt="${fi}:${oi}"><input data-fo="${fi}:${oi}:label" placeholder="label e.g. 🇧🇩 Bangladesh" value="${esc(o.label || '')}"><input data-fo="${fi}:${oi}:value" placeholder="API value" value="${esc(o.value || '')}" style="max-width:100px"><input data-fo="${fi}:${oi}:price" type="number" placeholder="price" value="${o.price != null ? o.price : ''}" style="max-width:80px"><button class="btn btn-bad btn-sm" data-del-opt="${fi}:${oi}">${icon('x')}</button></div>`;
 
   function readFieldsFromDom() {
     // sync editing.fields from inputs
@@ -281,7 +282,7 @@
     });
     document.querySelectorAll('[data-fo]').forEach((el) => {
       const [fi, oi, key] = el.dataset.fo.split(':'); const f = editing.fields[+fi]; if (!f || !f.options || !f.options[+oi]) return;
-      if (key === 'price') f.options[+oi].price = el.value === '' ? undefined : Number(el.value); else f.options[+oi].label = el.value;
+      if (key === 'price') f.options[+oi].price = el.value === '' ? undefined : Number(el.value); else if (key === 'value') f.options[+oi].value = el.value.trim(); else f.options[+oi].label = el.value;
     });
   }
   async function saveService() {
