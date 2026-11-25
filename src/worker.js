@@ -5,6 +5,10 @@ import ADMIN_HTML from './client/admin.html';
 import ADMIN_CSS from './client/admin.css';
 import ADMIN_JS from './client/admin.client.js';
 import { DEFAULT_SETTINGS, DEFAULT_CATS, DEFAULT_SERVICES, DEFAULT_NOTICES, TEXT_DEFAULTS } from './data.js';
+import { wzPrice, PRICING_JS, pricingSnapshot } from './pricing.js';
+// the browser gets the exact same pricing engine the server uses
+const APP_JS_OUT = PRICING_JS + APP_JS;
+const ADMIN_JS_OUT = PRICING_JS + ADMIN_JS;
 
 const enc = new TextEncoder();
 const PBKDF2_ITER = 100000;
@@ -13,7 +17,7 @@ const SESSION_DAYS = 30;
 /* ---------------- small helpers ---------------- */
 const VERSION = (() => {
   let h = 2166136261;
-  const s = APP_JS + APP_CSS + ADMIN_JS + ADMIN_CSS;
+  const s = APP_JS_OUT + APP_CSS + ADMIN_JS_OUT + ADMIN_CSS;
   for (let i = 0; i < s.length; i += 5) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
   return (h >>> 0).toString(36);
 })();
@@ -144,23 +148,24 @@ async function handleAuth(req, env, url, path, secure) {
 
 /* ---------------- order amount ---------------- */
 function computeOrder(svc, fields) {
-  let amount = +svc.price || 0;
+  const P = (svc.pricing && typeof svc.pricing === 'object') ? svc.pricing : {};
+  const mode = (P.mode === 'qty' || P.mode === 'formula') ? P.mode : 'fixed';
+  const qKey = String(P.qtyKey || 'quantity');
   const clean = {};
   for (const f of svc.fields || []) {
+    if (mode !== 'fixed' && f.key === qKey) continue; // the pricing engine owns the quantity box
     const v = fields[f.key];
     if (v == null || v === '') { if (f.required) return { error: f.key }; clean[f.key] = ''; continue; }
     if (f.type === 'select') {
       const opt = (f.options || []).find((o) => (o.value || o.label) === v);
       if (!opt) return { error: f.key };
       clean[f.key] = opt.value || opt.label;
-      if (typeof opt.price === 'number') amount += opt.price;
     } else if (f.type === 'number') {
       const n = toNum(v);
       if (!Number.isFinite(n)) return { error: f.key };
       if (f.min != null && n < f.min) return { error: f.key };
       if (f.max != null && n > f.max) return { error: f.key };
       clean[f.key] = n;
-      if (f.priceFromValue) amount += n;
     } else if (f.type === 'phone') {
       const p = clip(v, 14); if (!PHONE_RE.test(p)) return { error: f.key };
       clean[f.key] = p;
@@ -170,10 +175,14 @@ function computeOrder(svc, fields) {
     } else {
       clean[f.key] = clip(v, 500);
     }
-    // a fixed price set on the box: deducted from balance when the box is filled
-    if (typeof f.price === 'number' && f.price > 0) amount += f.price;
   }
-  return { amount: Math.round(amount), clean };
+  // the price is NEVER taken from the browser: recompute it from the saved product config
+  const vals = { ...clean };
+  if (mode !== 'fixed') vals[qKey] = fields[qKey];
+  const pr = wzPrice(svc, vals);
+  if (!pr.ok) return { error: qKey, code: pr.err };
+  if (pr.qty != null) clean[qKey] = pr.qty;
+  return { amount: pr.amount, clean, price: pr };
 }
 
 /* ---------------- per-product auto-delivery via external API ---------------- */
@@ -309,11 +318,12 @@ async function handleApi(req, env, url, path, u, secure) {
     const svc = services.find((s) => s.id === clip(b.svcId, 40) && s.active);
     if (!svc) return json({ ok: false, error: 'service' }, 404);
     const r = computeOrder(svc, b.fields || {});
-    if (r.error) return json({ ok: false, error: 'field', field: r.error }, 400);
+    if (r.error) return json({ ok: false, error: 'field', field: r.error, code: r.code || '' }, 400);
     if (r.amount <= 0) return json({ ok: false, error: 'amount' }, 400);
     const direct = b.payVia === 'direct';
     const ts = now(), id = 'WF' + String(ts).slice(-8) + rid(3).toUpperCase();
     const order = { id, uid: u.id, uname: u.name, svcId: svc.id, svcName: svc.name, cat: svc.cat, fields: r.clean, amount: r.amount, status: 'pending', note: '', ts, payVia: direct ? 'direct' : 'wallet' };
+    order.pricing = pricingSnapshot(svc, r.price); // frozen: later rate changes never touch this order
     const key = 'o:' + sortKey(ts);
     let outBalance;
     if (direct) {
@@ -842,9 +852,9 @@ export default {
       if (path.startsWith('/api/')) return await handleApi(req, env, url, path, u, secure);
 
       if (path === '/app.css') return text(APP_CSS, 'text/css; charset=utf-8', 'public, max-age=31536000, immutable');
-      if (path === '/app.js') return text(APP_JS, 'text/javascript; charset=utf-8', 'public, max-age=31536000, immutable');
+      if (path === '/app.js') return text(APP_JS_OUT, 'text/javascript; charset=utf-8', 'public, max-age=31536000, immutable');
       if (path === '/admin.css') return text(ADMIN_CSS, 'text/css; charset=utf-8', 'public, max-age=31536000, immutable');
-      if (path === '/admin.js') return text(ADMIN_JS, 'text/javascript; charset=utf-8', 'public, max-age=31536000, immutable');
+      if (path === '/admin.js') return text(ADMIN_JS_OUT, 'text/javascript; charset=utf-8', 'public, max-age=31536000, immutable');
       if (path === '/admin' || path === '/admin/')
         return text(ADMIN_HTML.replace(/\{\{V\}\}/g, VERSION), 'text/html; charset=utf-8', 'no-store', 200, { 'x-robots-tag': 'noindex' });
       if (path === '/robots.txt') return text('User-agent: *\nDisallow: /admin\n', 'text/plain', 'public, max-age=86400');

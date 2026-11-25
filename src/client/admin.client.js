@@ -206,6 +206,90 @@
   let editing = null; // service being edited (deep copy)
   function newService(presetCat) { editing = { id: 'svc' + Date.now().toString(36), cat: presetCat || (S.cats[0] || {}).id || '', icon: 'bolt', color: '#0f766e', active: true, featured: false, price: 0, name: '', sub: '', note: '', fields: [] }; svcModal(); }
   function editService(id) { const s = S.services.find((x) => x.id === id); editing = JSON.parse(JSON.stringify(s)); if (!editing.fields) editing.fields = []; svcModal(); }
+
+  /* ---------- hybrid pricing editor (per product; uses the shared wzPrice engine for the preview) ---------- */
+  function pricingBoxHtml(s) {
+    const P = s.pricing || {}; const mode = (P.mode === 'qty' || P.mode === 'formula') ? P.mode : 'fixed';
+    const v = (x) => (x == null ? '' : esc(String(x)));
+    const modes = [['fixed', 'Fixed price', 'One set price'], ['qty', 'Quantity-based', 'Followers, likes, views'], ['formula', 'Custom formula', 'Base + per-unit rules']];
+    return `<div class="pr-box">
+      <div class="pr-h">${icon('money')}<b>Pricing</b><span class="muted">This product only</span></div>
+      <input type="hidden" id="f-pmode" value="${mode}">
+      <div class="pr-modes">${modes.map(([k, t1, t2]) => `<button type="button" class="pr-mode ${mode === k ? 'on' : ''}" data-pmode="${k}"><b>${t1}</b><small>${t2}</small></button>`).join('')}</div>
+      <div class="pr-sec" data-pm-sec="fixed">
+        <div class="field"><label>Product price (৳)</label><input id="f-price" type="number" min="0" step="any" value="${s.price || 0}"><div class="muted" style="font-size:11px">Customers can't change it. Keep 0 only if a dropdown sets per-option prices.</div></div>
+      </div>
+      <div class="pr-sec" data-pm-sec="qty">
+        <div class="grid2">
+          <div class="field"><label>Base quantity</label><input id="f-bq" type="number" min="1" value="${v(P.baseQty != null ? P.baseQty : 1000)}"></div>
+          <div class="field"><label>Base price (৳)</label><input id="f-bp" type="number" min="0" step="any" value="${v(P.basePrice != null ? P.basePrice : '')}" placeholder="e.g. 70"></div>
+        </div>
+        <div class="muted pr-note">Total = quantity ÷ base quantity × base price. e.g. 1000 = ৳70 → 5000 = ৳350</div>
+      </div>
+      <div class="pr-sec" data-pm-sec="formula">
+        <div class="grid2">
+          <div class="field"><label>Base amount (৳)</label><input id="f-fbase" type="number" min="0" step="any" value="${v(P.base)}" placeholder="0"></div>
+          <div class="field"><label>Per-unit rate (৳)</label><input id="f-frate" type="number" min="0" step="any" value="${v(P.rate)}" placeholder="e.g. 0.07"></div>
+          <div class="field"><label>Adjustment (%)</label><input id="f-fpct" type="number" step="any" value="${v(P.pct)}" placeholder="e.g. 10 or -5"></div>
+          <div></div>
+          <div class="field"><label>Minimum charge (৳)</label><input id="f-fminc" type="number" min="0" step="any" value="${v(P.minCharge)}" placeholder="0 = none"></div>
+          <div class="field"><label>Maximum charge (৳)</label><input id="f-fmaxc" type="number" min="0" step="any" value="${v(P.maxCharge)}" placeholder="0 = none"></div>
+        </div>
+        <label class="flex" style="gap:6px;margin-bottom:8px"><input type="checkbox" id="f-fuseq" ${P.useQty ? 'checked' : ''} style="width:auto"> Customer enters a quantity (units)</label>
+        <div class="muted pr-note">Total = (base + rate × units) × (100 + adjustment)% , kept between min and max charge.</div>
+      </div>
+      <div class="pr-sec" data-pm-sec="limits">
+        <div class="pr-sub">Quantity limits</div>
+        <div class="grid2">
+          <div class="field"><label>Minimum quantity</label><input id="f-minq" type="number" min="0" value="${v(P.minQty != null ? P.minQty : 100)}"></div>
+          <div class="field"><label>Maximum quantity</label><input id="f-maxq" type="number" min="0" value="${v(P.maxQty != null ? P.maxQty : '')}" placeholder="0 = no limit"></div>
+          <div class="field"><label>Quantity step</label><input id="f-step" type="number" min="1" value="${v(P.step != null ? P.step : 1)}"></div>
+          <div class="field"><label>Box label</label><input id="f-qlabel" value="${v(P.qtyLabel)}" placeholder="Quantity"></div>
+        </div>
+      </div>
+      <details class="pr-adv" ${(P.minAmount || P.maxAmount) ? 'open' : ''}><summary>Order amount limits (optional)</summary>
+        <div class="grid2" style="margin-top:8px">
+          <div class="field"><label>Minimum order (৳)</label><input id="f-mina" type="number" min="0" value="${v(P.minAmount)}" placeholder="0 = off"></div>
+          <div class="field"><label>Maximum order (৳)</label><input id="f-maxa" type="number" min="0" value="${v(P.maxAmount)}" placeholder="0 = off"></div>
+        </div>
+      </details>
+      <div class="pr-preview"><span>Preview</span><input id="f-ptest" type="number" min="0" placeholder="quantity" value="${v(P.minQty != null ? P.minQty : 1000)}"><b id="f-pout">—</b></div>
+    </div>`;
+  }
+  function readPricing() {
+    const n = (id) => { const el = $(id); if (!el || el.value === '') return undefined; const x = Number(el.value); return Number.isFinite(x) ? x : undefined; };
+    const prev = (editing && editing.pricing) || {};
+    const mode = ($('#f-pmode') || {}).value || 'fixed';
+    const P = { ...prev, mode, qtyKey: prev.qtyKey || 'quantity' };
+    const set = (k, val) => { if (val === undefined) delete P[k]; else P[k] = val; };
+    set('baseQty', n('#f-bq')); set('basePrice', n('#f-bp'));
+    set('base', n('#f-fbase')); set('rate', n('#f-frate')); set('pct', n('#f-fpct')); set('minCharge', n('#f-fminc')); set('maxCharge', n('#f-fmaxc'));
+    P.useQty = !!($('#f-fuseq') && $('#f-fuseq').checked);
+    set('minQty', n('#f-minq')); set('maxQty', n('#f-maxq')); set('step', n('#f-step'));
+    const ql = $('#f-qlabel'); if (ql && ql.value.trim()) P.qtyLabel = ql.value.trim(); else delete P.qtyLabel;
+    set('minAmount', n('#f-mina')); set('maxAmount', n('#f-maxa'));
+    return P;
+  }
+  function wirePricing() {
+    const box = $('.pr-box'); if (!box) return;
+    const show = () => {
+      const mode = $('#f-pmode').value; const useQ = mode === 'qty' || (mode === 'formula' && $('#f-fuseq').checked);
+      box.querySelectorAll('.pr-mode').forEach((b) => b.classList.toggle('on', b.dataset.pmode === mode));
+      box.querySelectorAll('[data-pm-sec]').forEach((sec) => { const k = sec.dataset.pmSec; sec.style.display = (k === mode || (k === 'limits' && useQ)) ? '' : 'none'; });
+      $('#f-ptest').style.display = useQ ? '' : 'none';
+      preview();
+    };
+    const preview = () => {
+      const P = readPricing(); const price = Number(($('#f-price') || {}).value) || 0;
+      const r = wzPrice({ price, pricing: P, fields: [] }, { [P.qtyKey || 'quantity']: $('#f-ptest').value });
+      const msg = { qty_required: 'enter a quantity', qty_invalid: 'whole numbers only', qty_min: 'below minimum', qty_max: 'above maximum', qty_step: 'not a valid step', config: 'set base quantity & price', amount_min: 'below minimum order', amount_max: 'above maximum order' };
+      $('#f-pout').textContent = r.ok ? '৳' + r.amount.toLocaleString('en-US') : (msg[r.err] || r.err);
+      $('#f-pout').classList.toggle('bad', !r.ok);
+    };
+    box.querySelectorAll('.pr-mode').forEach((b) => b.addEventListener('click', () => { $('#f-pmode').value = b.dataset.pmode; show(); }));
+    box.addEventListener('input', preview); $('#f-fuseq').addEventListener('change', show);
+    show();
+  }
   function svcModal() {
     const s = editing;
     modal(tl(s.name) ? 'Edit product' : 'New product', `
@@ -228,8 +312,8 @@
         <div class="field"><label>Category</label><select id="f-cat">${S.cats.map((c) => `<option value="${esc(c.id)}" ${s.cat === c.id ? 'selected' : ''}>${esc(tl(c.name))}</option>`).join('')}</select></div>
         <div class="field"><label>Icon (if no image)</label><select id="f-icon">${['bolt', 'diamond', 'crown', 'thumb', 'phone', 'wallet', 'box', 'grid', 'money', 'eye'].map((n) => `<option value="${n}" ${s.icon === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
         <div class="field"><label>Color</label><input id="f-color" type="color" value="${esc(s.color || '#0f766e')}" style="height:42px;padding:3px"></div>
-        <div class="field"><label>Product price (৳)</label><input id="f-price" type="number" min="0" value="${s.price || 0}"><div class="muted" style="font-size:11px">One price for this product, cut from balance. Keep 0 only if you use a Dropdown with per-option prices.</div></div>
       </div>
+      ${pricingBoxHtml(s)}
       <div class="flex" style="margin:4px 0 14px">
         <label class="flex" style="gap:6px"><input type="checkbox" id="f-active" ${s.active ? 'checked' : ''} style="width:auto"> Active</label>
         <label class="flex" style="gap:6px"><input type="checkbox" id="f-featured" ${s.featured ? 'checked' : ''} style="width:auto"> Featured</label>
@@ -257,6 +341,7 @@
       </div>`,
       `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="svc-save">${icon('check')}Save product</button>`);
     $('#svc-save').addEventListener('click', saveService);
+    wirePricing();
     const apiOn = $('#f-api-on'); const apiDetail = $('#f-api-detail');
     if (apiOn && apiDetail) apiOn.addEventListener('change', () => { apiDetail.style.display = apiOn.checked ? '' : 'none'; });
     document.querySelectorAll('[data-apipreset]').forEach((bb) => bb.addEventListener('click', () => {
@@ -283,7 +368,7 @@
     $('#f-gimgfile').addEventListener('change', uploadGuideImage);
     const gdel = $('#f-gimgdel'); if (gdel) gdel.addEventListener('click', () => { readFieldsFromDom(); syncSvcText(); editing.guideImg = ''; svcModal(); });
   }
-  function syncSvcText() { const g = (id) => { const el = $(id); return el ? el.value : undefined; }; const n = g('#f-name'); if (n !== undefined) editing.name = n.trim(); const sb = g('#f-sub'); if (sb !== undefined) editing.sub = sb.trim(); const no = g('#f-note'); if (no !== undefined) editing.note = no.trim(); const cat = g('#f-cat'); if (cat !== undefined) editing.cat = cat; const ic = g('#f-icon'); if (ic !== undefined) editing.icon = ic; const col = g('#f-color'); if (col !== undefined) editing.color = col; const pr = g('#f-price'); if (pr !== undefined) editing.price = Number(pr) || 0; const ac = $('#f-active'); if (ac) editing.active = ac.checked; const fe = $('#f-featured'); if (fe) editing.featured = fe.checked; const gn = $('#f-gnote'); if (gn) editing.guideNote = gn.value.trim();
+  function syncSvcText() { const g = (id) => { const el = $(id); return el ? el.value : undefined; }; const n = g('#f-name'); if (n !== undefined) editing.name = n.trim(); const sb = g('#f-sub'); if (sb !== undefined) editing.sub = sb.trim(); const no = g('#f-note'); if (no !== undefined) editing.note = no.trim(); const cat = g('#f-cat'); if (cat !== undefined) editing.cat = cat; const ic = g('#f-icon'); if (ic !== undefined) editing.icon = ic; const col = g('#f-color'); if (col !== undefined) editing.color = col; const pr = g('#f-price'); if (pr !== undefined) editing.price = Number(pr) || 0; const ac = $('#f-active'); if (ac) editing.active = ac.checked; const fe = $('#f-featured'); if (fe) editing.featured = fe.checked; const gn = $('#f-gnote'); if (gn) editing.guideNote = gn.value.trim(); if ($('#f-pmode')) editing.pricing = readPricing();
     const ao = $('#f-api-on'); if (ao) { editing.api = editing.api || {}; editing.api.on = ao.checked; editing.api.doneOnOk = $('#f-api-done') ? $('#f-api-done').checked : !!editing.api.doneOnOk; editing.api.method = (g('#f-api-method') || 'POST'); editing.api.url = (g('#f-api-url') || '').trim(); editing.api.query = (g('#f-api-query') || '').trim(); editing.api.headers = (g('#f-api-headers') || '').trim(); editing.api.body = (g('#f-api-body') || '').trim(); editing.api.idPath = (g('#f-api-idpath') || '').trim(); } }
   async function uploadImage(e) {
     const file = e.target.files[0]; if (!file) return;
