@@ -603,21 +603,41 @@
       </div>
     </div>`;
   }
-  const pmNumRow = (mi, ni, n) => `<div class="pm-num">
-    <div class="grid2">
-      <div class="field"><label>Label (optional)</label><input data-pnf="${mi}:${ni}:label" value="${esc(n.label || '')}" placeholder="e.g. Personal 1"></div>
-      <div class="field"><label>Number</label><input data-pnf="${mi}:${ni}:number" value="${esc(n.number || '')}" placeholder="01XXXXXXXXX"></div>
-      <div class="field"><label>Type</label><select data-pnf="${mi}:${ni}:type">${['Personal', 'Agent', 'Merchant'].map((t) => `<option value="${t}" ${n.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
-      <div></div>
-      <div class="field"><label>Min amount (৳)</label><input type="number" min="0" data-pnf="${mi}:${ni}:min" value="${n.min || 0}"></div>
-      <div class="field"><label>Max amount (৳, empty = no limit)</label><input type="number" min="0" data-pnf="${mi}:${ni}:max" value="${n.max != null ? n.max : ''}"></div>
-    </div>
-    <div class="flex">
-      <label class="flex" style="gap:6px"><input type="checkbox" data-pnf="${mi}:${ni}:active" ${n.active !== false ? 'checked' : ''} style="width:auto"> Active</label>
-      <label class="flex" style="gap:6px"><input type="checkbox" data-pnf="${mi}:${ni}:hidden" ${n.hidden ? 'checked' : ''} style="width:auto"> Hidden from customers</label>
-      <button type="button" class="btn btn-bad btn-sm" data-del-pn="${mi}:${ni}" style="margin-left:auto">${icon('trash')}</button>
-    </div>
-  </div>`;
+  const pmNumRow = (mi, ni, n) => {
+    const vis = n.active !== false && !n.hidden;
+    const rng = `৳${n.min || 0}–${n.max != null ? n.max : '∞'}`;
+    return `<div class="pm-num-c">
+      <div class="pm-num-main">
+        <div class="pm-num-top"><b>${esc(n.number || '(no number)')}</b>${vis ? '' : '<span class="pm-tag off">hidden</span>'}</div>
+        <div class="pm-num-sub">${esc(n.type || 'Personal')}${n.label ? ' · ' + esc(n.label) : ''} · ${rng}</div>
+      </div>
+      <button type="button" class="ib" data-edit-pn="${mi}:${ni}" aria-label="Edit">${icon('edit')}</button>
+      <button type="button" class="ib" data-del-pn="${mi}:${ni}" aria-label="Delete">${icon('trash')}</button>
+    </div>`;
+  };
+  function numberModal(mi, ni) {
+    const m = pmMethods[mi]; if (!m) return;
+    const isNew = ni == null || ni < 0;
+    const n = isNew ? { label: '', number: '', type: 'Personal', min: 0, max: null, active: true, hidden: false } : m.numbers[ni];
+    const types = [['Personal', 'Personal — Send Money'], ['Agent', 'Agent — Cash Out'], ['Merchant', 'Merchant — Payment']];
+    modal(`${isNew ? 'Add' : 'Edit'} number`, `
+      <div style="margin:-4px 0 14px;color:${esc(m.color || '#0f766e')};font-weight:800">${esc(m.label || '')}</div>
+      <label class="flex" style="justify-content:space-between;gap:8px;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px"><b>Visible to customers</b><input type="checkbox" id="nm-vis" ${(n.active !== false && !n.hidden) ? 'checked' : ''} style="width:auto"></label>
+      <div class="field"><label>Account type</label><select id="nm-type">${types.map(([v, tl2]) => `<option value="${v}" ${n.type === v ? 'selected' : ''}>${tl2}</option>`).join('')}</select></div>
+      <div class="field"><label>Label (optional)</label><input id="nm-label" value="${esc(n.label || '')}" placeholder="e.g. Personal" maxlength="30"></div>
+      <div class="field"><label>Number</label><input id="nm-number" value="${esc(n.number || '')}" placeholder="01XXXXXXXXX" inputmode="numeric" maxlength="20"></div>
+      <div class="grid2"><div class="field"><label>From (৳)</label><input id="nm-min" type="number" min="0" value="${n.min || 0}"></div><div class="field"><label>To (৳, empty = no limit)</label><input id="nm-max" type="number" min="0" value="${n.max != null ? n.max : ''}"></div></div>
+      <div class="muted" style="font-size:11.5px">Below From or above To, this number is hidden for that amount — the customer uses another one.</div>
+    `, `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="nm-save">${icon('check')}${isNew ? 'Add' : 'Save'}</button>`);
+    $('#nm-save').addEventListener('click', () => {
+      const vis = $('#nm-vis').checked;
+      const num = { label: $('#nm-label').value.trim(), number: $('#nm-number').value.trim(), type: $('#nm-type').value, min: Number($('#nm-min').value) || 0, max: $('#nm-max').value === '' ? null : Number($('#nm-max').value), active: true, hidden: !vis };
+      if (!num.number) { toast('Enter a number'); return; }
+      m.numbers = m.numbers || [];
+      if (isNew) m.numbers.push(num); else m.numbers[ni] = num;
+      m._open = true; closeModal(); savePayments();
+    });
+  }
   function readPaymentsFromDom() {
     document.querySelectorAll('[data-pmf]').forEach((el) => { const [mi, k] = el.dataset.pmf.split(':'); const m = pmMethods[+mi]; if (!m) return; m[k] = el.type === 'checkbox' ? el.checked : el.value; });
     document.querySelectorAll('[data-pnf]').forEach((el) => {
@@ -631,7 +651,7 @@
     readPaymentsFromDom();
     const depositMethods = pmMethods.map((m) => ({ label: m.label, color: m.color, active: m.active !== false, numbers: (m.numbers || []).map((n) => ({ label: n.label, number: n.number, type: n.type, min: n.min, max: n.max, active: n.active !== false, hidden: !!n.hidden })) }));
     const r = await api('/api/admin/settings', { settings: { depositMethods } });
-    if (r.ok) { toast('Saved ✓'); vPayments(); } else toast('Error');
+    if (r.ok) { toast('Saved ✓'); renderPayments(); } else toast('Error');
   }
 
   /* ---------- helpers ---------- */
@@ -691,8 +711,9 @@
     if (e.target.closest('[data-act="add-notice"]')) { saveNotices(); notices.unshift({ id: 'n' + Date.now(), type: 'info', ts: Date.now(), title: '', body: '' }); const nl = $('#nlist'); if (nl) nl.innerHTML = renderNotices(); saveNoticesToServer(); return; }
     const delN = e.target.closest('[data-del-notice]'); if (delN) { saveNotices(); notices.splice(+delN.dataset.delNotice, 1); $('#nlist').innerHTML = renderNotices(); saveNoticesToServer(); return; }
     const delPm = e.target.closest('[data-del-pm]'); if (delPm) { readPaymentsFromDom(); if (confirm('Delete this payment method?')) { pmMethods.splice(+delPm.dataset.delPm, 1); renderPayments(); } return; }
-    const addPn = e.target.closest('[data-add-pn]'); if (addPn) { readPaymentsFromDom(); const m = pmMethods[+addPn.dataset.addPn]; m.numbers = m.numbers || []; m.numbers.push({ label: '', number: '', type: 'Personal', min: 0, max: null, active: true, hidden: false }); m._open = true; renderPayments(); return; }
-    const delPn = e.target.closest('[data-del-pn]'); if (delPn) { readPaymentsFromDom(); const [mi, ni] = delPn.dataset.delPn.split(':'); pmMethods[+mi].numbers.splice(+ni, 1); pmMethods[+mi]._open = true; renderPayments(); return; }
+    const addPn = e.target.closest('[data-add-pn]'); if (addPn) { readPaymentsFromDom(); numberModal(+addPn.dataset.addPn, -1); return; }
+    const editPn = e.target.closest('[data-edit-pn]'); if (editPn) { readPaymentsFromDom(); const [emi, eni] = editPn.dataset.editPn.split(':'); if (pmMethods[+emi]) pmMethods[+emi]._open = true; numberModal(+emi, +eni); return; }
+    const delPn = e.target.closest('[data-del-pn]'); if (delPn) { readPaymentsFromDom(); const [mi, ni] = delPn.dataset.delPn.split(':'); if (!confirm('Delete this number?')) return; pmMethods[+mi].numbers.splice(+ni, 1); pmMethods[+mi]._open = true; savePayments(); return; }
     if (e.target.closest('[data-act="add-pm"]')) { readPaymentsFromDom(); pmMethods.push({ label: '', color: '#0f766e', active: true, numbers: [], _open: true }); renderPayments(); return; }
     const pmTog = e.target.closest('[data-pm-toggle]'); if (pmTog) { readPaymentsFromDom(); const m = pmMethods[+pmTog.dataset.pmToggle]; m._open = !m._open; renderPayments(); return; }
   });

@@ -126,6 +126,12 @@ textarea{resize:vertical;min-height:60px}
 .pm-card.open .pm-chev .ic{transform:rotate(90deg)}
 .pm-body{padding:4px 14px 16px;border-top:1px solid var(--line)}
 .pm-num{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.pm-num-c{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:#fff}
+.pm-num-c .pm-num-main{flex:1;min-width:0}
+.pm-num-top{display:flex;align-items:center;gap:8px}
+.pm-num-top b{font-size:14px}
+.pm-num-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.pm-tag.off{font-size:10px;font-weight:700;background:#fef3c7;color:#b45309;padding:1px 7px;border-radius:999px}
 .ib{all:unset;box-sizing:border-box;cursor:pointer;display:grid;place-items:center;width:32px;height:32px;border-radius:9px;color:var(--muted)}
 .ib:hover{background:var(--bg)}
 .ib .ic{width:17px;height:17px}
