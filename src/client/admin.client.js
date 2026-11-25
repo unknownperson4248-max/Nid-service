@@ -198,7 +198,7 @@
     const priceLbl = (s.price || 0) > 0 ? money(s.price) : (s.fields || []).some((f) => f.type === 'select') ? 'from options' : 'free';
     const vars = s.variants || []; const vo = varOpen[s.id];
     return `<div class="prod-wrap${vo ? ' vopen' : ''}"><div class="prod-row">
-      <button type="button" class="ib prod-chev" data-prod-tog="${s.id}" title="Sub-products">${icon('right')}</button>
+      <button type="button" class="prod-chev" data-prod-tog="${s.id}" title="Sub-products">${icon('down')}</button>
       <span class="prod-thumb" data-prod-tog="${s.id}">${s.image ? `<img src="${esc(s.image)}" alt="">` : `<span style="background:${s.color || '#0f766e'}">${icon(iconName(s.icon))}</span>`}</span>
       <div class="prod-info" data-prod-tog="${s.id}"><b>${esc(tl(s.name))}</b><small>${esc(tl(s.sub))} • ${priceLbl}${s.featured ? ' • ★' : ''}${vars.length ? ` • ${vars.length} sub-product${vars.length > 1 ? 's' : ''}` : ''}</small></div>
       <div class="prod-actions">
