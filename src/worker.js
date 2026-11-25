@@ -71,6 +71,8 @@ async function getNotices(env) {
   const n = await env.DATA.get('notices', 'json');
   return Array.isArray(n) ? n : DEFAULT_NOTICES;
 }
+// list() wrapper that never throws on a KV daily-limit / 429, so admin pages degrade gracefully
+async function safeList(env, opts) { try { return await env.DATA.list(opts); } catch { return { keys: [], list_complete: true, cursor: null }; } }
 
 /* ---------------- auth ---------------- */
 function cookie(name, val, days, secure) {
@@ -223,27 +225,49 @@ async function saveOrderStatus(env, key, order) {
   const i = ul.findIndex((x) => x.id === order.id);
   if (i >= 0) { ul[i].status = order.status; await env.DATA.put('uo:' + order.uid, JSON.stringify(ul)); }
 }
+// retry queue tracked as a small index array (get), NOT a KV list() — saves list ops
+async function apiqAdd(env, okey) {
+  await env.DATA.put('apiq:' + okey, '1');
+  const idx = (await env.DATA.get('apiq_index', 'json')) || [];
+  if (!idx.includes(okey)) { idx.push(okey); await env.DATA.put('apiq_index', JSON.stringify(idx.slice(-500))); }
+}
+async function apiqDrop(env, okey) {
+  await env.DATA.delete('apiq:' + okey);
+  const idx = (await env.DATA.get('apiq_index', 'json')) || [];
+  const n = idx.filter((k) => k !== okey);
+  if (n.length !== idx.length) await env.DATA.put('apiq_index', JSON.stringify(n));
+}
+// recent "live" feed cached as one array (get) so /api/home never needs a list()
+async function pushLive(env, order) {
+  try { const live = (await env.DATA.get('live_orders', 'json')) || []; live.unshift(orderMeta(order)); await env.DATA.put('live_orders', JSON.stringify(live.slice(0, 12))); } catch {}
+}
 async function retryApiQueue(env) {
+  const idx = (await env.DATA.get('apiq_index', 'json')) || [];
+  if (!idx.length) return;
   const [settings, services] = await Promise.all([getSettings(env), getServices(env)]);
   const t = now();
-  const keys = (await env.DATA.list({ prefix: 'apiq:', limit: 300 })).keys;
   const backoff = [60, 120, 300, 600, 1800]; // seconds
-  for (const qk of keys) {
-    const okey = qk.name.slice(5);
+  const done = [];
+  for (const okey of idx.slice(0, 300)) {
     const order = await env.DATA.get(okey, 'json');
-    if (!order || !order.api || order.api.state !== 'queued') { await env.DATA.delete(qk.name); continue; }
+    if (!order || !order.api || order.api.state !== 'queued') { done.push(okey); continue; }
     if ((order.api.nextTs || 0) > t) continue;
     const svc = services.find((s) => s.id === order.svcId);
-    if (!svc || !svc.api || !svc.api.on) { await env.DATA.delete(qk.name); continue; }
-    if (order.api.extId) { order.api.state = 'ok'; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; await env.DATA.delete(qk.name); await saveOrderStatus(env, okey, order); continue; }
-    { const prevId = getByPath(parseApiBody(order.api.resp), svc.api.idPath); if (prevId != null && prevId !== '') { order.api.extId = String(prevId); order.api.state = 'ok'; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; await env.DATA.delete(qk.name); await saveOrderStatus(env, okey, order); continue; } }
+    if (!svc || !svc.api || !svc.api.on) { done.push(okey); continue; }
+    if (order.api.extId) { order.api.state = 'ok'; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; done.push(okey); await saveOrderStatus(env, okey, order); continue; }
+    { const prevId = getByPath(parseApiBody(order.api.resp), svc.api.idPath); if (prevId != null && prevId !== '') { order.api.extId = String(prevId); order.api.state = 'ok'; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; done.push(okey); await saveOrderStatus(env, okey, order); continue; } }
     const res = await runProductApi(order, svc, settings);
     order.api.attempts = (order.api.attempts || 1) + 1;
     order.api.resp = res.resp; order.api.error = res.error || ''; order.api.status = res.status || 0;
-    if (res.ok) { order.api.state = 'ok'; order.api.extId = res.extId || ''; order.status = svc.api.doneOnOk ? 'done' : 'processing'; await env.DATA.delete(qk.name); }
-    else if (!apiRetryable(res) || order.api.attempts >= 8) { order.api.state = 'failed'; await env.DATA.delete(qk.name); }
+    if (res.ok) { order.api.state = 'ok'; order.api.extId = res.extId || ''; order.status = svc.api.doneOnOk ? 'done' : 'processing'; done.push(okey); }
+    else if (!apiRetryable(res) || order.api.attempts >= 8) { order.api.state = 'failed'; done.push(okey); }
     else order.api.nextTs = t + backoff[Math.min(order.api.attempts - 1, backoff.length - 1)] * 1000;
     await saveOrderStatus(env, okey, order);
+  }
+  if (done.length) {
+    const cur = (await env.DATA.get('apiq_index', 'json')) || [];
+    await env.DATA.put('apiq_index', JSON.stringify(cur.filter((k) => !done.includes(k))));
+    for (const k of done) await env.DATA.delete('apiq:' + k).catch(() => {});
   }
 }
 
@@ -257,8 +281,7 @@ async function handleApi(req, env, url, path, u, secure) {
     const [services, cats, notices] = await Promise.all([getServices(env), getCats(env), getNotices(env)]);
     // live feed from a cached array (get) to avoid a KV list() on every home load;
     // fall back to list() but never let it break the home page
-    let live = (await env.DATA.get('live_orders', 'json')) || null;
-    if (!live) { try { live = (await env.DATA.list({ prefix: 'o:', limit: 12 })).keys.map((k) => k.metadata).filter(Boolean); } catch { live = []; } }
+    const live = (await env.DATA.get('live_orders', 'json')) || [];
     return json({ ok: true, user: u ? pubUser(u) : null, settings: pubSettings(settings),
       services: services.filter((s) => s.active).map(({ api, ...rest }) => rest), cats, notices, live });
   }
@@ -304,10 +327,11 @@ async function handleApi(req, env, url, path, u, secure) {
     }
     await env.DATA.put('u:' + u.id, JSON.stringify(fresh));
     await env.DATA.put(key, JSON.stringify(order), { metadata: orderMeta(order) });
+    await pushLive(env, order);
     const ul = (await env.DATA.get('uo:' + u.id, 'json')) || [];
     ul.unshift({ key, id, status: order.status, ts, svcName: svc.name, amount: r.amount });
     await env.DATA.put('uo:' + u.id, JSON.stringify(ul.slice(0, 100)));
-    if (order.api && order.api.state === 'queued') await env.DATA.put('apiq:' + key, '1');
+    if (order.api && order.api.state === 'queued') await apiqAdd(env, key);
     await bumpStat(env, 'orders');
     return json({ ok: true, order: { id, amount: r.amount, status: order.status }, balance: fresh.balance });
   }
@@ -329,7 +353,7 @@ async function handleApi(req, env, url, path, u, secure) {
     const owner = await env.DATA.get('u:' + u.id, 'json');
     if (owner) { owner.balance = Math.round((owner.balance || 0) + o.amount); await env.DATA.put('u:' + u.id, JSON.stringify(owner)); }
     o.status = 'rejected'; o.note = 'Cancelled by customer — amount refunded.'; o.cancelledByUser = true;
-    await env.DATA.delete('apiq:' + okey);
+    await apiqDrop(env, okey);
     await saveOrderStatus(env, okey, o);
     return json({ ok: true, balance: owner ? owner.balance : undefined });
   }
@@ -514,21 +538,21 @@ async function handleAdmin(req, env, url, path, u) {
     const services = await getServices(env); const svc = services.find((s) => s.id === order.svcId);
     if (!svc || !svc.api || !svc.api.on) return json({ ok: false, error: 'noapi' }, 400);
     // safety: if this order already got an external id, it already succeeded — don't call again (avoid double delivery)
-    if (order.api && order.api.extId) { order.api.state = 'ok'; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; await env.DATA.delete('apiq:' + okey); await saveOrderStatus(env, okey, order); return json({ ok: true, api: order.api, status: order.status, already: true }); }
+    if (order.api && order.api.extId) { order.api.state = 'ok'; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; await apiqDrop(env, okey); await saveOrderStatus(env, okey, order); return json({ ok: true, api: order.api, status: order.status, already: true }); }
     // recover: the stored response may already hold a success id (e.g. an SSE launch mis-parsed earlier) — never re-call then
-    { const prevId = order.api ? getByPath(parseApiBody(order.api.resp), svc.api.idPath) : undefined; if (prevId != null && prevId !== '') { order.api.extId = String(prevId); order.api.state = 'ok'; order.api.error = ''; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; await env.DATA.delete('apiq:' + okey); await saveOrderStatus(env, okey, order); return json({ ok: true, api: order.api, status: order.status, recovered: true }); } }
+    { const prevId = order.api ? getByPath(parseApiBody(order.api.resp), svc.api.idPath) : undefined; if (prevId != null && prevId !== '') { order.api.extId = String(prevId); order.api.state = 'ok'; order.api.error = ''; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; await apiqDrop(env, okey); await saveOrderStatus(env, okey, order); return json({ ok: true, api: order.api, status: order.status, recovered: true }); } }
     const res = await runProductApi(order, svc, await getSettings(env));
     order.api = order.api || {}; order.api.attempts = (order.api.attempts || 1) + 1; order.api.resp = res.resp; order.api.error = res.error || ''; order.api.status = res.status || 0;
-    if (res.ok) { order.api.state = 'ok'; order.api.extId = res.extId || ''; order.status = svc.api.doneOnOk ? 'done' : 'processing'; await env.DATA.delete('apiq:' + okey); }
-    else if (apiRetryable(res)) { order.api.state = 'queued'; order.api.nextTs = now() + 60000; await env.DATA.put('apiq:' + okey, '1'); }
-    else { order.api.state = 'failed'; await env.DATA.delete('apiq:' + okey); }
+    if (res.ok) { order.api.state = 'ok'; order.api.extId = res.extId || ''; order.status = svc.api.doneOnOk ? 'done' : 'processing'; await apiqDrop(env, okey); }
+    else if (apiRetryable(res)) { order.api.state = 'queued'; order.api.nextTs = now() + 60000; await apiqAdd(env, okey); }
+    else { order.api.state = 'failed'; await apiqDrop(env, okey); }
     await saveOrderStatus(env, okey, order);
     return json({ ok: true, api: order.api, status: order.status });
   }
 
   if (path === '/api/admin/overview') {
     const [orders, deps, users] = await Promise.all([
-      env.DATA.list({ prefix: 'o:', limit: 1000 }), env.DATA.list({ prefix: 'dep:', limit: 1000 }), env.DATA.list({ prefix: 'u:', limit: 1000 }),
+      safeList(env, { prefix: 'o:', limit: 1000 }), safeList(env, { prefix: 'dep:', limit: 1000 }), safeList(env, { prefix: 'u:', limit: 1000 }),
     ]);
     const pend = orders.keys.filter((k) => k.metadata && k.metadata.status === 'pending').length;
     const pdep = deps.keys.filter((k) => k.metadata && k.metadata.status === 'pending').length;
@@ -538,7 +562,7 @@ async function handleAdmin(req, env, url, path, u) {
 
   if (path === '/api/admin/orders') {
     const status = url.searchParams.get('status') || '';
-    const list = (await env.DATA.list({ prefix: 'o:', limit: 200 })).keys;
+    const list = (await safeList(env, { prefix: 'o:', limit: 200 })).keys;
     const items = await Promise.all(list.filter((k) => !status || (k.metadata && k.metadata.status === status)).slice(0, 100)
       .map(async (k) => ({ key: k.name, ...(await env.DATA.get(k.name, 'json')) })));
     return json({ ok: true, items: items.filter((x) => x.id) });
@@ -561,7 +585,7 @@ async function handleAdmin(req, env, url, path, u) {
 
   if (path === '/api/admin/deposits') {
     const status = url.searchParams.get('status') || '';
-    const list = (await env.DATA.list({ prefix: 'dep:', limit: 200 })).keys;
+    const list = (await safeList(env, { prefix: 'dep:', limit: 200 })).keys;
     const items = await Promise.all(list.filter((k) => !status || (k.metadata && k.metadata.status === status)).slice(0, 100)
       .map(async (k) => ({ key: k.name, ...(await env.DATA.get(k.name, 'json')) })));
     return json({ ok: true, items: items.filter((x) => x.id) });
@@ -625,7 +649,7 @@ async function handleAdmin(req, env, url, path, u) {
   }
 
   if (path === '/api/admin/users') {
-    const list = (await env.DATA.list({ prefix: 'u:', limit: 500 })).keys;
+    const list = (await safeList(env, { prefix: 'u:', limit: 500 })).keys;
     const items = await Promise.all(list.map(async (k) => { const x = await env.DATA.get(k.name, 'json'); return x ? pubUser(x) : null; }));
     return json({ ok: true, items: items.filter(Boolean).sort((a, b) => b.ts - a.ts) });
   }
