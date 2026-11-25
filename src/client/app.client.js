@@ -508,7 +508,13 @@
     const items = (r.items || []);
     v.innerHTML = `<div class="ph"><button class="back" data-back>${icon('left')}</button><h2>${u('orderHistory')}</h2></div>
       ${items.length ? `<div class="ord-list">${items.map(orderRow).join('')}</div>` : emptyBox(u('noOrders'))}<div style="height:10px"></div>`;
+    // auto-refresh while any order is still processing/pending, so "processing" -> "done" updates on its own
+    if (items.some((o) => o.status === 'processing' || o.status === 'pending')) {
+      clearTimeout(ordersTimer);
+      ordersTimer = setTimeout(() => { if (S.route === 'orders') viewOrders(v); }, 5000);
+    }
   }
+  let ordersTimer = null;
   const orderRow = (o) => { const data = esc(JSON.stringify({ id: o.id, svcId: o.svcId, svcName: o.svcName, fields: o.fields, amount: o.amount, status: o.status, ts: o.ts, note: o.note, respImg: o.respImg }));
     return `<div class="ord-card" data-order='${data}'>
       <div class="ord-top"><span class="ord-av">${icon('box')}</span><span class="ord-main"><b>${esc(t(o.svcName))}</b><small>${o.id} • ${ago(o.ts)}</small></span>${statusBadge(o.status)}</div>

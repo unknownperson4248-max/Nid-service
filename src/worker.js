@@ -251,7 +251,7 @@ async function runProductApi(order, svc, settings) {
   } catch (e) { return { ok: false, error: String((e && e.message) || e).slice(0, 200) }; }
 }
 // retry only transient failures (network error / 5xx / 429); a 4xx (bad auth, limit, bad request) will not fix itself
-const apiRetryable = (r) => !r.ok && (!r.status || r.status >= 500 || r.status === 429);
+const apiRetryable = (r) => !r.ok; // auto-retry any failure; the queue caps attempts at 8 and the id-guards prevent double delivery
 async function saveOrderStatus(env, key, order) {
   await env.DATA.put(key, JSON.stringify(order), { metadata: orderMeta(order) });
   await trackAdd(env, key, order);
@@ -339,7 +339,7 @@ async function retryApiQueue(env) {
     if (order.api.extId) { order.api.state = 'ok'; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; done.push(okey); await saveOrderStatus(env, okey, order); continue; }
     { const prevId = getByPath(parseApiBody(order.api.resp), svc.api.idPath); if (prevId != null && prevId !== '') { order.api.extId = String(prevId); order.api.state = 'ok'; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; done.push(okey); await saveOrderStatus(env, okey, order); continue; } }
     const res = await runProductApi(order, svc, settings);
-    order.api.attempts = (order.api.attempts || 1) + 1;
+    order.api.attempts = (order.api.attempts || 0) + 1;
     order.api.resp = res.resp; order.api.error = res.error || ''; order.api.status = res.status || 0;
     if (res.ok) { order.api.state = 'ok'; order.api.extId = res.extId || ''; order.status = svc.api.doneOnOk ? 'done' : 'processing'; done.push(okey); }
     else if (!apiRetryable(res) || order.api.attempts >= 8) { order.api.state = 'failed'; done.push(okey); }
@@ -354,7 +354,7 @@ async function retryApiQueue(env) {
 }
 
 /* ---------------- customer APIs ---------------- */
-async function handleApi(req, env, url, path, u, secure) {
+async function handleApi(req, env, url, path, u, secure, ctx) {
   const settings = await getSettings(env);
 
   if (path === '/api/me') return json({ ok: true, user: u ? pubUser(u) : null, settings: pubSettings(settings) });
@@ -414,12 +414,11 @@ async function handleApi(req, env, url, path, u, secure) {
       const fresh = await env.DATA.get('u:' + u.id, 'json');
       if ((fresh.balance || 0) < r.amount) return json({ ok: false, error: 'balance', need: r.amount, have: fresh.balance || 0 }, 400);
       fresh.balance = Math.round((fresh.balance || 0) - r.amount);
-      // auto-delivery: call the provider API immediately after payment
+      // auto-delivery runs in the BACKGROUND: the order shows "processing" instantly and
+      // the customer moves on; it flips to "done" when delivery succeeds, and retries on error
       if (svc.api && svc.api.on && svc.api.url) {
-        const res = await runProductApi(order, svc, settings);
-        const retry = apiRetryable(res);
-        order.api = { state: res.ok ? 'ok' : (retry ? 'queued' : 'failed'), extId: res.extId || '', resp: res.resp, error: res.error || '', status: res.status || 0, attempts: 1, nextTs: (res.ok || !retry) ? 0 : ts + 60000 };
-        if (res.ok) order.status = svc.api.doneOnOk ? 'done' : 'processing';
+        order.status = 'processing';
+        order.api = { state: 'queued', extId: '', resp: '', error: '', status: 0, attempts: 0, nextTs: 0 };
       }
       await env.DATA.put('u:' + u.id, JSON.stringify(fresh));
       await env.DATA.put(key, JSON.stringify(order), { metadata: orderMeta(order) });
@@ -429,7 +428,7 @@ async function handleApi(req, env, url, path, u, secure) {
     const ul = (await env.DATA.get('uo:' + u.id, 'json')) || [];
     ul.unshift({ key, id, status: order.status, ts, svcName: svc.name, amount: r.amount });
     await env.DATA.put('uo:' + u.id, JSON.stringify(ul.slice(0, 100)));
-    if (order.api && order.api.state === 'queued') await apiqAdd(env, key);
+    if (order.api && order.api.state === 'queued') { await apiqAdd(env, key); if (ctx && ctx.waitUntil) ctx.waitUntil(retryApiQueue(env).catch(() => {})); }
     await trackAdd(env, key, order);
     await bumpStat(env, 'orders');
     return json({ ok: true, order: { id, amount: r.amount, status: order.status }, balance: outBalance });
@@ -654,7 +653,7 @@ async function handleAdmin(req, env, url, path, u) {
     // recover: the stored response may already hold a success id (e.g. an SSE launch mis-parsed earlier) — never re-call then
     { const prevId = order.api ? getByPath(parseApiBody(order.api.resp), svc.api.idPath) : undefined; if (prevId != null && prevId !== '') { order.api.extId = String(prevId); order.api.state = 'ok'; order.api.error = ''; if (order.status === 'pending') order.status = svc.api.doneOnOk ? 'done' : 'processing'; await apiqDrop(env, okey); await saveOrderStatus(env, okey, order); return json({ ok: true, api: order.api, status: order.status, recovered: true }); } }
     const res = await runProductApi(order, svc, await getSettings(env));
-    order.api = order.api || {}; order.api.attempts = (order.api.attempts || 1) + 1; order.api.resp = res.resp; order.api.error = res.error || ''; order.api.status = res.status || 0;
+    order.api = order.api || {}; order.api.attempts = (order.api.attempts || 0) + 1; order.api.resp = res.resp; order.api.error = res.error || ''; order.api.status = res.status || 0;
     if (res.ok) { order.api.state = 'ok'; order.api.extId = res.extId || ''; order.status = svc.api.doneOnOk ? 'done' : 'processing'; await apiqDrop(env, okey); }
     else if (apiRetryable(res)) { order.api.state = 'queued'; order.api.nextTs = now() + 60000; await apiqAdd(env, okey); }
     else { order.api.state = 'failed'; await apiqDrop(env, okey); }
@@ -951,7 +950,7 @@ async function renderShellHtml(env, url) {
 
 /* ---------------- router ---------------- */
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const url = new URL(req.url);
     const path = url.pathname;
     const secure = url.protocol === 'https:';
@@ -960,7 +959,7 @@ export default {
       if (path.startsWith('/auth/google/')) return await handleGoogle(req, env, url, path, secure);
       const u = await userFromReq(req, env);
       if (path.startsWith('/api/admin/')) return await handleAdmin(req, env, url, path, u);
-      if (path.startsWith('/api/')) return await handleApi(req, env, url, path, u, secure);
+      if (path.startsWith('/api/')) return await handleApi(req, env, url, path, u, secure, ctx);
 
       if (path === '/app.css') return text(APP_CSS, 'text/css; charset=utf-8', 'public, max-age=31536000, immutable');
       if (path === '/app.js') return text(APP_JS_OUT, 'text/javascript; charset=utf-8', 'public, max-age=31536000, immutable');
