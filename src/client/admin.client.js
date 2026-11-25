@@ -146,6 +146,7 @@
 
   /* ---------- services (form builder) ---------- */
   let catOpen = {}; // which category sections are expanded (default: all open)
+  let varOpen = {}; // which products show their sub-products in the list
   async function vServices() {
     const c = $('#content'); c.innerHTML = '<div class="spin"></div>';
     const r = await api('/api/admin/services'); S.services = r.services || []; S.cats = r.cats || [];
@@ -186,9 +187,15 @@
       </div>
     </div>`;
   }
+  const varRate = (v) => { const P = v.pricing || {}; return P.mode !== 'fixed' ? `৳${P.basePrice != null ? P.basePrice : '?'} / ${P.baseQty != null ? P.baseQty : '?'} · min ${P.minQty != null ? P.minQty : 1} · max ${P.maxQty ? P.maxQty : '∞'}` : `৳${v.price || 0}`; };
+  const varMiniRow = (svcId, i, v) => `<div class="var-mini">
+      <div class="var-mini-main"><b>${esc(v.name || '(no name)')}</b><small>${varRate(v)}${v.serviceId ? ' · SMM ' + esc(v.serviceId) : ''}${v.active === false ? ' · off' : ''}</small></div>
+      <button type="button" class="ib" data-edit-var2="${svcId}:${i}" title="Edit">${icon('edit')}</button>
+      <button type="button" class="ib" data-del-var2="${svcId}:${i}" title="Delete" style="color:var(--bad)">${icon('trash')}</button></div>`;
   function prodRow(s) {
     const priceLbl = (s.price || 0) > 0 ? money(s.price) : (s.fields || []).some((f) => f.type === 'select') ? 'from options' : 'free';
-    return `<div class="prod-row" data-prod="${s.id}">
+    const vars = s.variants || []; const vo = varOpen[s.id];
+    return `<div class="prod-wrap"><div class="prod-row" data-prod="${s.id}">
       <span class="prod-thumb">${s.image ? `<img src="${esc(s.image)}" alt="">` : `<span style="background:${s.color || '#0f766e'}">${icon(iconName(s.icon))}</span>`}</span>
       <div class="prod-info"><b>${esc(tl(s.name))}</b><small>${esc(tl(s.sub))} • ${priceLbl}${s.featured ? ' • ★ featured' : ''}</small></div>
       <div class="prod-actions">
@@ -198,7 +205,56 @@
         <button type="button" class="ib" data-edit-svc="${s.id}" title="Edit">${icon('edit')}</button>
         <button type="button" class="ib" data-del-svc="${s.id}" title="Delete" style="color:var(--bad)">${icon('trash')}</button>
       </div>
+    </div>
+      <div class="var-area${vo ? ' open' : ''}">
+        <button type="button" class="var-tog" data-var-tog="${s.id}">${icon('right')}<span>Sub-products</span><span class="pill">${vars.length}</span></button>
+        ${vo ? `<div class="var-list">${vars.map((v, i) => varMiniRow(s.id, i, v)).join('')}${vars.length ? '' : `<div class="muted" style="padding:7px 10px;font-size:12.5px">No sub-products — this product uses its own price. Add one for Followers / Likes / Views etc.</div>`}
+          <button type="button" class="btn btn-ghost btn-sm" data-add-var2="${s.id}">${icon('plus')}Add sub-product</button></div>` : ''}
+      </div>
     </div>`;
+  }
+  function variantModal(svcId, vi) {
+    const sp = S.services.find((x) => x.id === svcId); if (!sp) return;
+    sp.variants = sp.variants || [];
+    const isNew = vi == null || vi < 0;
+    const v = isNew ? { id: 'v' + Date.now().toString(36), name: '', active: true, price: 0, pricing: { mode: 'qty', qtyKey: 'quantity', baseQty: 1000, minQty: 100, step: 1 } } : sp.variants[vi];
+    const P = v.pricing || {}; const isQ = P.mode !== 'fixed'; const val = (y) => (y == null ? '' : esc(String(y)));
+    modal(`${isNew ? 'Add' : 'Edit'} sub-product`, `
+      <div style="margin:-4px 0 12px;font-weight:700;color:var(--muted)">${esc(tl(sp.name))}</div>
+      <div class="field"><label>Name <span class="req">*</span></label><input id="v-name" value="${val(v.name)}" placeholder="e.g. Facebook Followers"></div>
+      <div class="field"><label>Price type</label><select id="v-mode"><option value="qty" ${isQ ? 'selected' : ''}>Quantity-based</option><option value="fixed" ${isQ ? '' : 'selected'}>Fixed price</option></select></div>
+      <div id="v-qty" ${isQ ? '' : 'style="display:none"'}>
+        <div class="grid2">
+          <div class="field"><label>Base quantity</label><input id="v-bq" type="number" min="1" value="${val(P.baseQty != null ? P.baseQty : 1000)}"></div>
+          <div class="field"><label>Base price (৳)</label><input id="v-bp" type="number" min="0" step="any" value="${val(P.basePrice)}" placeholder="e.g. 70"></div>
+          <div class="field"><label>Minimum order</label><input id="v-min" type="number" min="1" value="${val(P.minQty != null ? P.minQty : 100)}"></div>
+          <div class="field"><label>Maximum order</label><input id="v-max" type="number" min="0" value="${val(P.maxQty)}" placeholder="0 = no limit"></div>
+          <div class="field"><label>Step</label><input id="v-step" type="number" min="1" value="${val(P.step != null ? P.step : 1)}"></div>
+          <div class="field"><label>Preview</label><div class="pr-preview" style="margin:0"><input id="v-ptest" type="number" value="${val(P.minQty != null ? P.minQty : 1000)}"><b id="v-pout">—</b></div></div>
+        </div>
+      </div>
+      <div id="v-fix" ${isQ ? 'style="display:none"' : ''}><div class="field"><label>Price (৳)</label><input id="v-price" type="number" min="0" step="any" value="${val(v.price || 0)}"></div></div>
+      <div class="field"><label>Provider service ID (SMM)</label><input id="v-sid" value="${val(v.serviceId)}" placeholder="e.g. 567 · just the number from your panel"></div>
+      <label class="flex" style="gap:6px"><input type="checkbox" id="v-active" ${v.active !== false ? 'checked' : ''} style="width:auto"> Active (shown to customers)</label>
+    `, `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="v-save">${icon('check')}${isNew ? 'Add' : 'Save'}</button>`);
+    const num = (id) => { const el = $(id); if (!el || el.value === '') return undefined; const n = Number(el.value); return Number.isFinite(n) ? n : undefined; };
+    const collect = () => {
+      const mode = $('#v-mode').value === 'fixed' ? 'fixed' : 'qty';
+      const out = { ...v, name: $('#v-name').value.trim(), active: $('#v-active').checked, serviceId: $('#v-sid').value.trim().replace(/^\s*id[\s:_#-]*/i, '') };
+      if (mode === 'fixed') { out.price = num('#v-price') || 0; out.pricing = { ...(v.pricing || {}), mode: 'fixed', qtyKey: 'quantity' }; }
+      else { const P2 = { ...(v.pricing || {}), mode: 'qty', qtyKey: 'quantity' }; const set = (k, x) => { if (x === undefined) delete P2[k]; else P2[k] = x; }; set('baseQty', num('#v-bq')); set('basePrice', num('#v-bp')); set('minQty', num('#v-min')); set('maxQty', num('#v-max')); set('step', num('#v-step')); out.pricing = P2; }
+      return out;
+    };
+    const preview = () => { const o = collect(); const r = wzPrice({ price: o.price, pricing: o.pricing, fields: [] }, { quantity: $('#v-ptest') ? $('#v-ptest').value : '' }); $('#v-pout').textContent = r.ok ? '৳' + r.amount.toLocaleString('en-US') : (r.err || '—'); $('#v-pout').classList.toggle('bad', !r.ok); };
+    $('#v-mode').addEventListener('change', () => { const q = $('#v-mode').value !== 'fixed'; $('#v-qty').style.display = q ? '' : 'none'; $('#v-fix').style.display = q ? 'none' : ''; preview(); });
+    document.querySelectorAll('.modal input').forEach((el) => el.addEventListener('input', preview)); preview();
+    $('#v-save').addEventListener('click', async () => {
+      const o = collect();
+      if (!o.name) { toast('Name required'); return; }
+      if ((o.pricing.mode !== 'fixed') && !(o.pricing.basePrice >= 0 && o.pricing.baseQty > 0)) { toast('Set base quantity & price'); return; }
+      if (isNew) sp.variants.push(o); else sp.variants[vi] = o;
+      if (await saveServiceList(S.services)) { toast('Saved ✓'); closeModal(); varOpen[svcId] = true; vServices(); }
+    });
   }
   async function saveServiceList(list) { S.services = list; const r = await api('/api/admin/services', { services: list }); if (!r.ok) toast('Error'); return r.ok; }
   const iconName = (n) => (ICONS[n] ? n : 'bolt');
@@ -360,13 +416,7 @@
         <div class="field"><label>Color</label><input id="f-color" type="color" value="${esc(s.color || '#0f766e')}" style="height:42px;padding:3px"></div>
       </div>
       <div id="pr-wrap" ${(s.variants || []).length ? 'style="display:none"' : ''}>${pricingBoxHtml(s)}</div>
-      <div id="pr-varnote" class="muted pr-varnote" ${(s.variants || []).length ? '' : 'style="display:none"'}>${icon('info')} This product has sub-products — each one sets its own price below.</div>
-      <div class="vr-box">
-        <div class="pr-h">${icon('grid')}<b>Sub-products</b><span class="muted" id="vr-count">${(s.variants || []).length} added</span></div>
-        <div class="muted pr-note">e.g. Facebook → Followers, Likes, Views. Each has its own rate and minimum / maximum; the customer picks one, then enters a quantity.</div>
-        <div id="vr-list">${(s.variants || []).map(varRow).join('')}</div>
-        <button type="button" class="btn btn-ghost btn-sm" data-add-var>${icon('plus')}Add sub-product</button>
-      </div>
+      <div class="muted pr-varnote" ${(s.variants || []).length ? '' : 'style="display:none"'}>${icon('info')} This product has ${(s.variants || []).length} sub-product(s). Set their prices from the product list — open the product's <b>Sub-products</b> row. This product's own price is not used.</div>
       <div class="flex" style="margin:4px 0 14px">
         <label class="flex" style="gap:6px"><input type="checkbox" id="f-active" ${s.active ? 'checked' : ''} style="width:auto"> Active</label>
         <label class="flex" style="gap:6px"><input type="checkbox" id="f-featured" ${s.featured ? 'checked' : ''} style="width:auto"> Featured</label>
@@ -402,7 +452,6 @@
       `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="svc-save">${icon('check')}Save product</button>`);
     $('#svc-save').addEventListener('click', saveService);
     wirePricing();
-    if ((editing.variants || []).length) renderVariants();
     const balBtn = $('#f-api-bal'); if (balBtn) balBtn.addEventListener('click', async () => {
       const out = $('#f-api-balout'); out.textContent = 'Checking…';
       const r = await api('/api/admin/api-balance', { url: $('#f-api-url').value.trim(), format: $('#f-api-format').value, headers: $('#f-api-headers').value, body: $('#f-api-body').value });
@@ -852,9 +901,10 @@
     }
     const es = e.target.closest('[data-edit-svc]'); if (es) { editService(es.dataset.editSvc); return; }
     const ds = e.target.closest('[data-del-svc]'); if (ds) { if (confirm('Delete this product?')) { const list = S.services.filter((x) => x.id !== ds.dataset.delSvc); if (await saveServiceList(list)) { toast('Deleted'); renderServiceTree(); } } return; }
-    if (e.target.closest('[data-add-var]')) { readVariants(); editing.variants = editing.variants || []; editing.variants.forEach((x) => { x._open = false; }); editing.variants.push({ id: 'v' + Date.now().toString(36), name: '', active: true, price: 0, pricing: { mode: 'qty', qtyKey: 'quantity', baseQty: 1000, minQty: 100, step: 1 }, _open: true }); renderVariants(); return; }
-    const dvar = e.target.closest('[data-del-var]'); if (dvar) { readVariants(); if (!confirm('Delete this sub-product?')) return; editing.variants.splice(+dvar.dataset.delVar, 1); renderVariants(); return; }
-    const tvar = e.target.closest('[data-tog-var]'); if (tvar) { readVariants(); const x = editing.variants[+tvar.dataset.togVar]; if (x) x._open = !x._open; renderVariants(); return; }
+    const vtog = e.target.closest('[data-var-tog]'); if (vtog) { varOpen[vtog.dataset.varTog] = !varOpen[vtog.dataset.varTog]; vServices(); return; }
+    const avar = e.target.closest('[data-add-var2]'); if (avar) { variantModal(avar.dataset.addVar2, -1); return; }
+    const evar = e.target.closest('[data-edit-var2]'); if (evar) { const [vs, vi] = evar.dataset.editVar2.split(':'); variantModal(vs, +vi); return; }
+    const dvar = e.target.closest('[data-del-var2]'); if (dvar) { const [vs, vi] = dvar.dataset.delVar2.split(':'); if (!confirm('Delete this sub-product?')) return; const sp = S.services.find((x) => x.id === vs); if (sp && sp.variants) { sp.variants.splice(+vi, 1); saveServiceList(S.services).then((ok) => { if (ok) { toast('Deleted'); vServices(); } }); } return; }
     if (e.target.closest('[data-act="add-field"]')) { readFieldsFromDom(); editing.fields.push({ key: '', type: 'text', required: false, label: '' }); $('#fields-wrap').innerHTML = editing.fields.map(fieldEditor).join(''); return; }
     const qa = e.target.closest('[data-qa]'); if (qa) { readFieldsFromDom();
       const presets = {
