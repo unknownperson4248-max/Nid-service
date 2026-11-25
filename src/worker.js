@@ -5,7 +5,7 @@ import ADMIN_HTML from './client/admin.html';
 import ADMIN_CSS from './client/admin.css';
 import ADMIN_JS from './client/admin.client.js';
 import { DEFAULT_SETTINGS, DEFAULT_CATS, DEFAULT_SERVICES, DEFAULT_NOTICES, TEXT_DEFAULTS } from './data.js';
-import { wzPrice, PRICING_JS, pricingSnapshot } from './pricing.js';
+import { wzPrice, PRICING_JS, pricingSnapshot, variantOf, hasVariants } from './pricing.js';
 // the browser gets the exact same pricing engine the server uses
 const APP_JS_OUT = PRICING_JS + APP_JS;
 const ADMIN_JS_OUT = PRICING_JS + ADMIN_JS;
@@ -148,7 +148,11 @@ async function handleAuth(req, env, url, path, secure) {
 
 /* ---------------- order amount ---------------- */
 function computeOrder(svc, fields) {
-  const P = (svc.pricing && typeof svc.pricing === 'object') ? svc.pricing : {};
+  // sub-product: price config comes from the chosen variant
+  const variant = variantOf(svc, fields.variant);
+  if (hasVariants(svc) && !variant) return { error: 'variant', code: 'variant_required' };
+  const eff = variant ? { ...svc, price: variant.price, pricing: variant.pricing } : svc;
+  const P = (eff.pricing && typeof eff.pricing === 'object') ? eff.pricing : {};
   const mode = (P.mode === 'qty' || P.mode === 'formula') ? P.mode : 'fixed';
   const qKey = String(P.qtyKey || 'quantity');
   const clean = {};
@@ -179,10 +183,12 @@ function computeOrder(svc, fields) {
   // the price is NEVER taken from the browser: recompute it from the saved product config
   const vals = { ...clean };
   if (mode !== 'fixed') vals[qKey] = fields[qKey];
+  if (variant) vals.variant = variant.id;
   const pr = wzPrice(svc, vals);
   if (!pr.ok) return { error: qKey, code: pr.err };
   if (pr.qty != null) clean[qKey] = pr.qty;
-  return { amount: pr.amount, clean, price: pr };
+  if (variant) clean.variant = clip(variant.name, 60); // readable in the order details
+  return { amount: pr.amount, clean, price: pr, eff, variant };
 }
 
 /* ---------------- per-product auto-delivery via external API ---------------- */
@@ -193,6 +199,7 @@ function apiSubst(tpl, order, secrets) {
     .replace(/\{(\w+)\}/g, (_, k) => {
       if (k === 'amount' || k === 'total') return String(order.amount);
       if (k === 'orderId') return String(order.id);
+      if (k === 'service' && order.variant && order.variant.serviceId) return String(order.variant.serviceId); // per sub-product provider service id
       const v = order.fields && order.fields[k];
       return v == null ? '' : String(v);
     });
@@ -323,7 +330,8 @@ async function handleApi(req, env, url, path, u, secure) {
     const direct = b.payVia === 'direct';
     const ts = now(), id = 'WF' + String(ts).slice(-8) + rid(3).toUpperCase();
     const order = { id, uid: u.id, uname: u.name, svcId: svc.id, svcName: svc.name, cat: svc.cat, fields: r.clean, amount: r.amount, status: 'pending', note: '', ts, payVia: direct ? 'direct' : 'wallet' };
-    order.pricing = pricingSnapshot(svc, r.price); // frozen: later rate changes never touch this order
+    order.pricing = pricingSnapshot(r.eff || svc, r.price); // frozen: later rate changes never touch this order
+    if (r.variant) order.variant = { id: String(r.variant.id), name: clip(r.variant.name, 60), serviceId: clip(r.variant.serviceId, 40) };
     const key = 'o:' + sortKey(ts);
     let outBalance;
     if (direct) {

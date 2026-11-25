@@ -310,7 +310,8 @@
     S.services.filter((s) => s.active).forEach((s) => {
       const opts = (s.fields || []).find((f) => f.type === 'select' && (f.options || []).some((o) => typeof o.price === 'number'));
       const pm = pricingOf(s);
-      if (pm.mode === 'qty') rows.push([`${t(s.name)} — ${(+pm.P.baseQty || 0).toLocaleString('en-US')}`, +pm.P.basePrice || 0]);
+      if (variantsOf(s).length) variantsOf(s).forEach((x) => { const xp = x.pricing || {}; rows.push([`${t(s.name)} — ${x.name}${xp.mode === 'qty' ? ' (' + (+xp.baseQty || 0).toLocaleString('en-US') + ')' : ''}`, xp.mode === 'qty' ? +xp.basePrice || 0 : +x.price || 0]); });
+      else if (pm.mode === 'qty') rows.push([`${t(s.name)} — ${(+pm.P.baseQty || 0).toLocaleString('en-US')}`, +pm.P.basePrice || 0]);
       else if (opts) opts.options.filter((o) => typeof o.price === 'number').slice(0, 6).forEach((o) => rows.push([`${t(s.name)} — ${o.label}`, o.price]));
       else rows.push([t(s.name), svcMinPrice(s)]);
     });
@@ -332,6 +333,7 @@
     const s = S.services.find((x) => x.id === id && x.active);
     if (!s) { v.innerHTML = emptyBox(u('services')); return; }
     const en = S.lang === 'en';
+    const eff0 = effOf(s, variantsOf(s).length ? variantsOf(s)[0].id : '');
     const methods = (S.settings.depositMethods || []).filter((m) => (m.numbers || []).some((n) => n.number));
     v.innerHTML = `
       <div class="ph"><button class="back" data-back>${icon('left')}</button><div><h2>${esc(t(s.name))}</h2><div class="sub">${esc(t(s.sub))}</div></div></div>
@@ -340,8 +342,11 @@
       <form id="svc-form">
         <div class="card card-pad co-card">
           <div class="co-sec">${en ? 'Your details' : 'আপনার তথ্য'}</div>
-          ${(s.fields || []).filter((f) => !(pricingOf(s).needQty && f.key === pricingOf(s).qKey)).map(fieldHtml).join('')}
-          ${qtyBoxHtml(s)}
+          ${variantsOf(s).length ? `<div class="field"><label>${en ? 'Choose type' : 'ধরন বেছে নিন'} <span class="req">*</span></label>
+            <input type="hidden" name="variant" value="${esc(variantsOf(s)[0].id)}">
+            <div class="pk-grid vr-grid" data-pkg="variant">${variantsOf(s).map((x, i) => `<button type="button" class="pk ${i === 0 ? 'on' : ''}" data-pk="variant" data-v="${esc(x.id)}"><span class="pk-l">${esc(x.name)}</span><span class="pk-note">${esc(variantRate(x))}</span></button>`).join('')}</div></div>` : ''}
+          ${(s.fields || []).filter((f) => !(pricingOf(eff0).needQty && f.key === pricingOf(eff0).qKey)).map(fieldHtml).join('')}
+          <div id="qty-wrap">${qtyBoxHtml(eff0)}</div>
           ${(s.guideImg || s.guideNote) ? `<div class="guide-box"><div class="guide-h">${icon('info')}<span>${en ? 'How to order' : 'কিভাবে অর্ডার করবেন'}</span></div>${s.guideImg ? `<a href="${esc(s.guideImg)}" target="_blank" rel="noopener"><img class="guide-img" src="${esc(s.guideImg)}" alt=""></a>` : ''}${s.guideNote ? `<div class="guide-note">${esc(s.guideNote)}</div>` : ''}</div>` : ''}
         </div>
         <div class="card card-pad co-card">
@@ -382,7 +387,8 @@
     const recalc = () => {
       const pr = wzPrice(s, formVals(form)); const total = pr.ok ? pr.amount : 0;
       $('#ord-total').textContent = money(total);
-      const qe = $('#qty-err'); if (qe) { const touched = String(formVals(form)[pricingOf(s).qKey] || '') !== ''; qe.textContent = (!pr.ok && touched && pr.err !== 'qty_required') ? qtyErrText(pr.err, pricingOf(s).P) : ''; }
+      const pe = pricingOf(effOf(s, formVals(form).variant));
+      const qe = $('#qty-err'); if (qe) { const touched = String(formVals(form)[pe.qKey] || '') !== ''; qe.textContent = (!pr.ok && touched && pr.err !== 'qty_required') ? qtyErrText(pr.err, pe.P) : ''; }
       const pa = $('#pay-amt'); if (pa) pa.textContent = money(total);
       const wb = $('.pay-wbal'); if (wb) wb.innerHTML = (total > 0 && walletBal < total) ? `<span class="pay-low">${en ? 'Low balance' : 'ব্যালেন্স কম'}</span>` : money(walletBal);
       if (total !== lastAmt) { lastAmt = total; renderPm(total); }
@@ -397,6 +403,7 @@
       form.querySelectorAll(`[data-pk="${key}"]`).forEach((b) => b.classList.remove('on'));
       btn.classList.add('on');
       form.querySelector(`input[name="${key}"]`).value = btn.dataset.v;
+      if (key === 'variant') { const qw = $('#qty-wrap'); if (qw) { const old = qw.querySelector('input'); const keep = old ? old.value : ''; qw.innerHTML = qtyBoxHtml(effOf(s, btn.dataset.v)); const ni = qw.querySelector('input'); if (ni && keep) ni.value = keep; } }
       recalc();
     }));
     // image upload fields: buyer attaches a picture
@@ -428,11 +435,16 @@
         <input type="file" accept="image/*" hidden></div></div>`;
     const type = f.type === 'number' ? 'number' : f.type === 'phone' ? 'tel' : 'text';
     const extra = f.type === 'number' ? `inputmode="numeric" ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''}` : f.type === 'phone' ? 'inputmode="numeric" maxlength="11"' : 'maxlength="300"';
-    return `<div class="field">${lbl}<input name="${esc(f.key)}" type="${type}" ${extra} ${f.required ? 'required' : ''} placeholder="${esc(f.ph || '')}"></div>`;
+    const lim = f.type === 'number' && (f.min != null || f.max != null) ? `<div class="qty-hint">${[f.min != null ? `${S.lang === 'en' ? 'Minimum order' : 'সর্বনিম্ন অর্ডার'}: <b>${esc(f.min)}</b>` : '', f.max != null ? `${S.lang === 'en' ? 'Maximum order' : 'সর্বোচ্চ অর্ডার'}: <b>${esc(f.max)}</b>` : ''].filter(Boolean).join(' · ')}</div>` : '';
+    return `<div class="field${lim ? ' qty-field' : ''}">${lbl}<input name="${esc(f.key)}" type="${type}" ${extra} ${f.required ? 'required' : ''} placeholder="${esc(f.ph || '')}">${lim}</div>`;
   }
   const formVals = (form) => Object.fromEntries(new FormData(form));
   // price preview uses the SAME engine as the server (wzPrice is injected before this script)
   function calcPrice(s, vals) { const r = wzPrice(s, vals); return r.ok ? r.amount : 0; }
+  // sub-products (variants): each has its own price config; same pick rule as the engine
+  const variantsOf = (s) => ((s && s.variants) || []).filter((x) => x && x.active !== false);
+  const effOf = (s, vid) => { const x = variantsOf(s).find((y) => String(y.id) === String(vid == null ? '' : vid)); return x ? { ...s, price: x.price, pricing: x.pricing } : s; };
+  const variantRate = (x) => { const P = x.pricing || {}; return P.mode === 'qty' ? `${money(+P.basePrice || 0)} / ${(+P.baseQty || 0).toLocaleString('en-US')}` : money(+x.price || 0); };
   const pricingOf = (s) => { const P = (s && s.pricing) || {}; const mode = (P.mode === 'qty' || P.mode === 'formula') ? P.mode : 'fixed'; return { P, mode, qKey: String(P.qtyKey || 'quantity'), needQty: mode === 'qty' || (mode === 'formula' && !!P.useQty) }; };
   function qtyErrText(code, P) {
     const en = S.lang === 'en'; const minQ = Math.max(1, Math.floor(+P.minQty || 0)), maxQ = Math.floor(+P.maxQty || 0), step = Math.max(1, Math.floor(+P.step || 1));
@@ -440,24 +452,26 @@
       qty_min: (en ? 'Minimum ' : 'সর্বনিম্ন ') + minQ, qty_max: (en ? 'Maximum ' : 'সর্বোচ্চ ') + maxQ,
       qty_step: (en ? 'Use steps of ' : 'ধাপ হতে হবে ') + step + (Math.floor(+P.minQty || 0) > 0 ? (en ? ' from ' : ', শুরু ') + Math.floor(+P.minQty || 0) : ''),
       amount_min: (en ? 'Minimum order ' : 'সর্বনিম্ন অর্ডার ') + money(+P.minAmount || 0), amount_max: (en ? 'Maximum order ' : 'সর্বোচ্চ অর্ডার ') + money(+P.maxAmount || 0),
-      config: en ? 'Price not set for this product' : 'এই প্রোডাক্টের দাম সেট করা নেই' };
+      config: en ? 'Price not set for this product' : 'এই প্রোডাক্টের দাম সেট করা নেই',
+      variant_required: en ? 'Choose a type first' : 'আগে ধরন বেছে নিন' };
     return m[code] || u('fillAll');
   }
   function qtyBoxHtml(s) {
     const { P, mode, qKey, needQty } = pricingOf(s); if (!needQty) return '';
     const en = S.lang === 'en'; const minQ = Math.max(1, Math.floor(+P.minQty || 0)), maxQ = Math.floor(+P.maxQty || 0), step = Math.max(1, Math.floor(+P.step || 1));
     const rate = mode === 'qty' ? `${money(+P.basePrice || 0)} / ${(+P.baseQty || 0).toLocaleString('en-US')}` : '';
-    const lims = [`${en ? 'Min' : 'সর্বনিম্ন'} ${minQ.toLocaleString('en-US')}`, maxQ > 0 ? `${en ? 'Max' : 'সর্বোচ্চ'} ${maxQ.toLocaleString('en-US')}` : '', step > 1 ? `${en ? 'Step' : 'ধাপ'} ${step.toLocaleString('en-US')}` : ''].filter(Boolean).join(' · ');
+    const lims = [`${en ? 'Minimum order' : 'সর্বনিম্ন অর্ডার'}: <b>${minQ.toLocaleString('en-US')}</b>`, maxQ > 0 ? `${en ? 'Maximum order' : 'সর্বোচ্চ অর্ডার'}: <b>${maxQ.toLocaleString('en-US')}</b>` : '', step > 1 ? `${en ? 'Step' : 'ধাপ'}: ${step.toLocaleString('en-US')}` : ''].filter(Boolean).join(' · ');
     return `<div class="field qty-field"><label>${esc(P.qtyLabel || (en ? 'Quantity' : 'পরিমাণ'))} <span class="req">*</span></label>
       <input name="${esc(qKey)}" type="number" inputmode="numeric" min="${minQ}" ${maxQ > 0 ? `max="${maxQ}"` : ''} step="${step}" placeholder="${minQ}" required>
-      <div class="qty-hint">${rate ? `<b>${rate}</b> · ` : ''}${lims}</div><div class="qty-err" id="qty-err"></div></div>`;
+      ${rate ? `<div class="qty-rate">${en ? 'Rate' : 'রেট'}: <b>${rate}</b></div>` : ''}
+      <div class="qty-hint">${lims}</div><div class="qty-err" id="qty-err"></div></div>`;
   }
   async function placeOrder(s, form) {
     const en = S.lang === 'en';
     const vals = formVals(form); const errEl = $('#ord-err');
     for (const f of s.fields || []) if (f.required && !vals[f.key]) { errEl.innerHTML = `<div class="err-msg">${u('fillAll')}</div>`; return; }
     const pq = wzPrice(s, vals);
-    if (!pq.ok) { errEl.innerHTML = `<div class="err-msg">${qtyErrText(pq.err, pricingOf(s).P)}</div>`; return; }
+    if (!pq.ok) { errEl.innerHTML = `<div class="err-msg">${qtyErrText(pq.err, pricingOf(effOf(s, vals.variant)).P)}</div>`; return; }
     const amount = pq.amount;
     if (amount <= 0) { errEl.innerHTML = `<div class="err-msg">${u('fillAll')}</div>`; return; }
     const payVia = vals.payVia || 'wallet';
@@ -478,7 +492,7 @@
       location.hash = '#orders'; await loadHome(); render();
     }
     else if (r.error === 'balance') { errEl.innerHTML = `<div class="err-msg">${u('lowBalance')} — ${en ? 'use Direct bKash/Nagad' : 'ডাইরেক্ট bKash/Nagad দিন'}</div>`; }
-    else if (r.error === 'field' && r.code) { errEl.innerHTML = `<div class="err-msg">${qtyErrText(r.code, pricingOf(s).P)}</div>`; }
+    else if (r.error === 'field' && r.code) { errEl.innerHTML = `<div class="err-msg">${qtyErrText(r.code, pricingOf(effOf(s, vals.variant)).P)}</div>`; }
     else if (r.error === 'pay') { errEl.innerHTML = `<div class="err-msg">${en ? 'Enter a valid TrxID' : 'সঠিক TrxID দিন'}</div>`; }
     else { errEl.innerHTML = `<div class="err-msg">${u('fillAll')}</div>`; }
   }
@@ -655,7 +669,7 @@
   /* ---------- order detail sheet ---------- */
   function orderSheet(o) {
     const svc = S.services.find((x) => x.id === o.svcId);
-    const rows = Object.entries(o.fields || {}).map(([k, val]) => { const f = svc && (svc.fields || []).find((x) => x.key === k); const isImg = /^\/img\/[a-z0-9]{10,24}$/.test(String(val)); return `<div class="kv"><span class="k">${esc(f ? t(f.label) : k)}</span>${isImg ? `<a class="v" href="${esc(val)}" target="_blank" rel="noopener"><img src="${esc(val)}" alt="" style="max-width:120px;max-height:120px;border-radius:10px;border:1px solid var(--line)"></a>` : `<span class="v">${esc(val)}</span>`}</div>`; }).join('');
+    const rows = Object.entries(o.fields || {}).map(([k, val]) => { const f = svc && (svc.fields || []).find((x) => x.key === k); const isImg = /^\/img\/[a-z0-9]{10,24}$/.test(String(val)); return `<div class="kv"><span class="k">${esc(f ? t(f.label) : (k === 'variant' ? (S.lang === 'en' ? 'Type' : 'ধরন') : k === 'quantity' ? (S.lang === 'en' ? 'Quantity' : 'পরিমাণ') : k))}</span>${isImg ? `<a class="v" href="${esc(val)}" target="_blank" rel="noopener"><img src="${esc(val)}" alt="" style="max-width:120px;max-height:120px;border-radius:10px;border:1px solid var(--line)"></a>` : `<span class="v">${esc(val)}</span>`}</div>`; }).join('');
     openSheet(`<div class="sheet-h"><h3>${esc(t(o.svcName))}</h3><button class="x" data-sheet-close>${icon('x')}</button></div>
       <div style="margin-bottom:12px">${statusBadge(o.status)}</div>
       <div class="kv"><span class="k">${u('orderId')}</span><span class="v">${esc(o.id)}</span></div>

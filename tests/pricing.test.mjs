@@ -61,6 +61,24 @@ eq('active promo applies', wzPrice({ price: 100, pricing: { promo: { pct: 50, un
 const browserWz = new Function(PRICING_JS + 'return wzPrice;')();
 for (const [svc, v] of [[fb, { quantity: 5000 }], [f1, { quantity: 1000 }], [glory, { duration: '16h' }], [gp, {}]]) eq('browser == server ' + JSON.stringify(v), browserWz(svc, v).amount, wzPrice(svc, v).amount);
 
+
+// --- sub-products: each variant has its own rate and limits
+const fbV = { price: 0, fields: [{ key: 'link', type: 'text' }], variants: [
+  { id: 'fol', name: 'Followers', pricing: { mode: 'qty', baseQty: 1000, basePrice: 70, minQty: 100, maxQty: 50000, step: 100 } },
+  { id: 'lik', name: 'Likes', pricing: { mode: 'qty', baseQty: 1000, basePrice: 40, minQty: 50, maxQty: 10000 } },
+  { id: 'pkg', name: 'Page package', price: 499, pricing: { mode: 'fixed' } },
+  { id: 'off', name: 'Old', active: false, pricing: { mode: 'qty', baseQty: 1, basePrice: 0 } } ] };
+eq('variant followers 1000 = 70', amt(fbV, { variant: 'fol', quantity: 1000 }), 70);
+eq('variant likes 1000 = 40', amt(fbV, { variant: 'lik', quantity: 1000 }), 40);
+eq('variant likes min 50 = 2', amt(fbV, { variant: 'lik', quantity: 50 }), 2);
+eq('variant likes own max 10000', amt(fbV, { variant: 'lik', quantity: 20000 }), 'qty_max');
+eq('variant followers own min 100', amt(fbV, { variant: 'fol', quantity: 50 }), 'qty_min');
+eq('variant fixed package = 499', amt(fbV, { variant: 'pkg' }), 499);
+eq('variant missing', amt(fbV, { quantity: 1000 }), 'variant_required');
+eq('variant inactive refused', amt(fbV, { variant: 'off', quantity: 1000 }), 'variant_required');
+eq('variant unknown refused', amt(fbV, { variant: 'hack', quantity: 1000 }), 'variant_required');
+eq('browser == server variant', browserWz(fbV, { variant: 'lik', quantity: 3000 }).amount, wzPrice(fbV, { variant: 'lik', quantity: 3000 }).amount);
+
 // --- snapshot keeps the rate that was used
 const r = wzPrice(fb, { quantity: 2000 });
 const snap = pricingSnapshot(fb, r);

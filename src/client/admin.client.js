@@ -97,7 +97,7 @@
   }
   function orderModal(o) {
     const svc = S.services.find((x) => x.id === o.svcId);
-    const rows = Object.entries(o.fields || {}).map(([k, v]) => { const f = svc && (svc.fields || []).find((x) => x.key === k); const isImg = /^\/img\/[a-z0-9]{10,24}$/.test(String(v)); return `<div><span class="k">${esc(f ? tl(f.label) : k)}:</span> ${isImg ? `<a href="${esc(v)}" target="_blank" rel="noopener"><img src="${esc(v)}" alt="" style="max-width:140px;max-height:140px;border-radius:8px;border:1px solid var(--line);vertical-align:middle"></a>` : `<b>${esc(v)}</b>`}</div>`; }).join('');
+    const rows = Object.entries(o.fields || {}).map(([k, v]) => { const f = svc && (svc.fields || []).find((x) => x.key === k); const isImg = /^\/img\/[a-z0-9]{10,24}$/.test(String(v)); return `<div><span class="k">${esc(f ? tl(f.label) : (k === 'variant' ? 'Type' : k === 'quantity' ? 'Quantity' : k))}:</span> ${isImg ? `<a href="${esc(v)}" target="_blank" rel="noopener"><img src="${esc(v)}" alt="" style="max-width:140px;max-height:140px;border-radius:8px;border:1px solid var(--line);vertical-align:middle"></a>` : `<b>${esc(v)}</b>`}</div>`; }).join('');
     modal(`Order ${esc(o.id)}`, `
       <div class="flex" style="margin-bottom:10px">${badge(o.status)}<span class="pill">${new Date(o.ts).toLocaleString('en-GB')}</span></div>
       <div class="kvs"><div><span class="k">Customer:</span> <b>${esc(o.uname)}</b></div><div><span class="k">Service:</span> <b>${esc(tl(o.svcName))}</b></div><div><span class="k">Amount:</span> <b>${money(o.amount)}</b></div>${rows}</div>
@@ -290,6 +290,51 @@
     box.addEventListener('input', preview); $('#f-fuseq').addEventListener('change', show);
     show();
   }
+
+  /* ---------- sub-products (variants) editor ---------- */
+  function varRow(x, i) {
+    const P = x.pricing || {}; const isQ = P.mode !== 'fixed'; const v = (y) => (y == null ? '' : esc(String(y)));
+    const sum = isQ ? `৳${v(P.basePrice) || '?'} / ${v(P.baseQty) || '?'} · min ${v(P.minQty) || 1} · max ${P.maxQty ? v(P.maxQty) : '∞'}` : `৳${v(x.price) || 0}`;
+    return `<div class="vr-row${x._open ? ' open' : ''}">
+      <div class="vr-head" data-tog-var="${i}"><b>${esc(x.name || '(no name)')}</b><span class="muted vr-sum">${sum}</span>${x.active === false ? '<span class="pill">off</span>' : ''}
+        <span style="margin-left:auto"></span><button type="button" class="ib" data-del-var="${i}" aria-label="Delete">${icon('trash')}</button><span class="ib vr-chev">${icon('back')}</span></div>
+      <div class="vr-body" ${x._open ? '' : 'hidden'}>
+        <div class="grid2">
+          <div class="field"><label>Name</label><input data-vf="${i}:name" value="${v(x.name)}" placeholder="e.g. Facebook Followers"></div>
+          <div class="field"><label>Price type</label><select data-vf="${i}:mode"><option value="qty" ${isQ ? 'selected' : ''}>Quantity-based</option><option value="fixed" ${isQ ? '' : 'selected'}>Fixed price</option></select></div>
+          <div class="field" ${isQ ? '' : 'style="display:none"'}><label>Base quantity</label><input type="number" min="1" data-vf="${i}:baseQty" value="${v(P.baseQty != null ? P.baseQty : 1000)}"></div>
+          <div class="field" ${isQ ? '' : 'style="display:none"'}><label>Base price (৳)</label><input type="number" min="0" step="any" data-vf="${i}:basePrice" value="${v(P.basePrice)}" placeholder="e.g. 70"></div>
+          <div class="field" ${isQ ? '' : 'style="display:none"'}><label>Minimum order</label><input type="number" min="1" data-vf="${i}:minQty" value="${v(P.minQty != null ? P.minQty : 100)}"></div>
+          <div class="field" ${isQ ? '' : 'style="display:none"'}><label>Maximum order</label><input type="number" min="0" data-vf="${i}:maxQty" value="${v(P.maxQty)}" placeholder="0 = no limit"></div>
+          <div class="field" ${isQ ? '' : 'style="display:none"'}><label>Step</label><input type="number" min="1" data-vf="${i}:step" value="${v(P.step != null ? P.step : 1)}"></div>
+          <div class="field" ${isQ ? 'style="display:none"' : ''}><label>Price (৳)</label><input type="number" min="0" step="any" data-vf="${i}:price" value="${v(x.price)}"></div>
+          <div class="field"><label>Provider service ID (SMM)</label><input data-vf="${i}:serviceId" value="${v(x.serviceId)}" placeholder="optional · used as {service}"></div>
+        </div>
+        <label class="flex" style="gap:6px"><input type="checkbox" data-vf="${i}:active" ${x.active !== false ? 'checked' : ''} style="width:auto"> Active (shown to customers)</label>
+      </div></div>`;
+  }
+  function readVariants() {
+    if (!editing || !Array.isArray(editing.variants)) return;
+    document.querySelectorAll('[data-vf]').forEach((el) => {
+      const [i, k] = el.dataset.vf.split(':'); const x = editing.variants[+i]; if (!x) return;
+      x.pricing = x.pricing || { mode: 'qty', qtyKey: 'quantity' };
+      const n = el.value === '' ? undefined : Number(el.value);
+      if (k === 'name' || k === 'serviceId') x[k] = el.value.trim();
+      else if (k === 'active') x.active = el.checked;
+      else if (k === 'mode') x.pricing.mode = el.value === 'fixed' ? 'fixed' : 'qty';
+      else if (k === 'price') x.price = Number.isFinite(n) ? n : 0;
+      else if (n === undefined || !Number.isFinite(n)) delete x.pricing[k]; else x.pricing[k] = n;
+    });
+  }
+  function renderVariants() {
+    const list = editing.variants || [];
+    $('#vr-list').innerHTML = list.map(varRow).join('');
+    $('#vr-count').textContent = list.length + ' added';
+    $('#pr-wrap').style.display = list.length ? 'none' : '';
+    $('#pr-varnote').style.display = list.length ? '' : 'none';
+    document.querySelectorAll('[data-vf$=":mode"]').forEach((sel) => sel.addEventListener('change', () => { readVariants(); renderVariants(); }));
+    document.querySelectorAll('[data-vf]').forEach((el) => el.addEventListener('input', () => { readVariants(); const i = +el.dataset.vf.split(':')[0]; const row = $('#vr-list').children[i]; const x = list[i]; if (row && x) { const tmp = document.createElement('div'); tmp.innerHTML = varRow(x, i); row.querySelector('.vr-sum').textContent = tmp.querySelector('.vr-sum').textContent; row.querySelector('.vr-head b').textContent = x.name || '(no name)'; } }));
+  }
   function svcModal() {
     const s = editing;
     modal(tl(s.name) ? 'Edit product' : 'New product', `
@@ -313,7 +358,14 @@
         <div class="field"><label>Icon (if no image)</label><select id="f-icon">${['bolt', 'diamond', 'crown', 'thumb', 'phone', 'wallet', 'box', 'grid', 'money', 'eye'].map((n) => `<option value="${n}" ${s.icon === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
         <div class="field"><label>Color</label><input id="f-color" type="color" value="${esc(s.color || '#0f766e')}" style="height:42px;padding:3px"></div>
       </div>
-      ${pricingBoxHtml(s)}
+      <div id="pr-wrap" ${(s.variants || []).length ? 'style="display:none"' : ''}>${pricingBoxHtml(s)}</div>
+      <div id="pr-varnote" class="muted pr-varnote" ${(s.variants || []).length ? '' : 'style="display:none"'}>${icon('info')} This product has sub-products — each one sets its own price below.</div>
+      <div class="vr-box">
+        <div class="pr-h">${icon('grid')}<b>Sub-products</b><span class="muted" id="vr-count">${(s.variants || []).length} added</span></div>
+        <div class="muted pr-note">e.g. Facebook → Followers, Likes, Views. Each has its own rate and minimum / maximum; the customer picks one, then enters a quantity.</div>
+        <div id="vr-list">${(s.variants || []).map(varRow).join('')}</div>
+        <button type="button" class="btn btn-ghost btn-sm" data-add-var>${icon('plus')}Add sub-product</button>
+      </div>
       <div class="flex" style="margin:4px 0 14px">
         <label class="flex" style="gap:6px"><input type="checkbox" id="f-active" ${s.active ? 'checked' : ''} style="width:auto"> Active</label>
         <label class="flex" style="gap:6px"><input type="checkbox" id="f-featured" ${s.featured ? 'checked' : ''} style="width:auto"> Featured</label>
@@ -342,6 +394,7 @@
       `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="svc-save">${icon('check')}Save product</button>`);
     $('#svc-save').addEventListener('click', saveService);
     wirePricing();
+    if ((editing.variants || []).length) renderVariants();
     const apiOn = $('#f-api-on'); const apiDetail = $('#f-api-detail');
     if (apiOn && apiDetail) apiOn.addEventListener('change', () => { apiDetail.style.display = apiOn.checked ? '' : 'none'; });
     document.querySelectorAll('[data-apipreset]').forEach((bb) => bb.addEventListener('click', () => {
@@ -368,7 +421,7 @@
     $('#f-gimgfile').addEventListener('change', uploadGuideImage);
     const gdel = $('#f-gimgdel'); if (gdel) gdel.addEventListener('click', () => { readFieldsFromDom(); syncSvcText(); editing.guideImg = ''; svcModal(); });
   }
-  function syncSvcText() { const g = (id) => { const el = $(id); return el ? el.value : undefined; }; const n = g('#f-name'); if (n !== undefined) editing.name = n.trim(); const sb = g('#f-sub'); if (sb !== undefined) editing.sub = sb.trim(); const no = g('#f-note'); if (no !== undefined) editing.note = no.trim(); const cat = g('#f-cat'); if (cat !== undefined) editing.cat = cat; const ic = g('#f-icon'); if (ic !== undefined) editing.icon = ic; const col = g('#f-color'); if (col !== undefined) editing.color = col; const pr = g('#f-price'); if (pr !== undefined) editing.price = Number(pr) || 0; const ac = $('#f-active'); if (ac) editing.active = ac.checked; const fe = $('#f-featured'); if (fe) editing.featured = fe.checked; const gn = $('#f-gnote'); if (gn) editing.guideNote = gn.value.trim(); if ($('#f-pmode')) editing.pricing = readPricing();
+  function syncSvcText() { const g = (id) => { const el = $(id); return el ? el.value : undefined; }; const n = g('#f-name'); if (n !== undefined) editing.name = n.trim(); const sb = g('#f-sub'); if (sb !== undefined) editing.sub = sb.trim(); const no = g('#f-note'); if (no !== undefined) editing.note = no.trim(); const cat = g('#f-cat'); if (cat !== undefined) editing.cat = cat; const ic = g('#f-icon'); if (ic !== undefined) editing.icon = ic; const col = g('#f-color'); if (col !== undefined) editing.color = col; const pr = g('#f-price'); if (pr !== undefined) editing.price = Number(pr) || 0; const ac = $('#f-active'); if (ac) editing.active = ac.checked; const fe = $('#f-featured'); if (fe) editing.featured = fe.checked; const gn = $('#f-gnote'); if (gn) editing.guideNote = gn.value.trim(); if ($('#f-pmode')) editing.pricing = readPricing(); readVariants();
     const ao = $('#f-api-on'); if (ao) { editing.api = editing.api || {}; editing.api.on = ao.checked; editing.api.doneOnOk = $('#f-api-done') ? $('#f-api-done').checked : !!editing.api.doneOnOk; editing.api.method = (g('#f-api-method') || 'POST'); editing.api.url = (g('#f-api-url') || '').trim(); editing.api.query = (g('#f-api-query') || '').trim(); editing.api.headers = (g('#f-api-headers') || '').trim(); editing.api.body = (g('#f-api-body') || '').trim(); editing.api.idPath = (g('#f-api-idpath') || '').trim(); } }
   async function uploadImage(e) {
     const file = e.target.files[0]; if (!file) return;
@@ -422,6 +475,10 @@
     readFieldsFromDom(); syncSvcText();
     const s = editing;
     if (!tl(s.name)) { toast('Name required'); return; }
+    if (Array.isArray(s.variants)) {
+      s.variants = s.variants.filter((x) => x && x.name).map((x) => { const { _open, ...rest } = x; rest.id = rest.id || 'v' + Math.random().toString(36).slice(2, 8); rest.pricing = { qtyKey: 'quantity', ...(rest.pricing || {}) }; return rest; });
+      if (s.variants.some((x) => x.active !== false && x.pricing.mode !== 'fixed' && !(x.pricing.basePrice >= 0 && x.pricing.baseQty > 0))) { toast('Set base quantity & price for every sub-product'); return; }
+    }
     s.fields = (s.fields || []).map((f) => { const lbl = tl(f.label); if (!f.key) f.key = (lbl || 'f').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'f' + Math.random().toString(36).slice(2, 5); if (f.type === 'select') f.options = (f.options || []).filter((o) => o.label); return f; });
     const list = S.services.slice(); const idx = list.findIndex((x) => x.id === s.id);
     if (idx >= 0) list[idx] = s; else list.push(s);
@@ -777,6 +834,9 @@
     }
     const es = e.target.closest('[data-edit-svc]'); if (es) { editService(es.dataset.editSvc); return; }
     const ds = e.target.closest('[data-del-svc]'); if (ds) { if (confirm('Delete this product?')) { const list = S.services.filter((x) => x.id !== ds.dataset.delSvc); if (await saveServiceList(list)) { toast('Deleted'); renderServiceTree(); } } return; }
+    if (e.target.closest('[data-add-var]')) { readVariants(); editing.variants = editing.variants || []; editing.variants.forEach((x) => { x._open = false; }); editing.variants.push({ id: 'v' + Date.now().toString(36), name: '', active: true, price: 0, pricing: { mode: 'qty', qtyKey: 'quantity', baseQty: 1000, minQty: 100, step: 1 }, _open: true }); renderVariants(); return; }
+    const dvar = e.target.closest('[data-del-var]'); if (dvar) { readVariants(); if (!confirm('Delete this sub-product?')) return; editing.variants.splice(+dvar.dataset.delVar, 1); renderVariants(); return; }
+    const tvar = e.target.closest('[data-tog-var]'); if (tvar) { readVariants(); const x = editing.variants[+tvar.dataset.togVar]; if (x) x._open = !x._open; renderVariants(); return; }
     if (e.target.closest('[data-act="add-field"]')) { readFieldsFromDom(); editing.fields.push({ key: '', type: 'text', required: false, label: '' }); $('#fields-wrap').innerHTML = editing.fields.map(fieldEditor).join(''); return; }
     const qa = e.target.closest('[data-qa]'); if (qa) { readFieldsFromDom();
       const presets = {

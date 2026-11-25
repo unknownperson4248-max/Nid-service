@@ -29,6 +29,19 @@ export function wzPrice(svc, vals, nowMs) {
   var pctOff = function (p, pct) { pct = Math.min(100, Math.max(0, num(pct, 0))); return Math.round(p * (100 - pct) / 100); };
   var fail = function (mode, err, qty) { return { ok: false, mode: mode, err: err, qty: qty == null ? null : qty, amount: 0 }; };
 
+  // sub-products: a product may hold variants (e.g. Facebook -> Followers / Likes / Views),
+  // each with its own price config; the customer's choice arrives as vals.variant (the variant id)
+  var variant = null;
+  var vlist = (svc && Array.isArray(svc.variants)) ? svc.variants : [];
+  var hasV = false;
+  for (var vi = 0; vi < vlist.length; vi++) {
+    if (!vlist[vi] || vlist[vi].active === false) continue;
+    hasV = true;
+    if (String(vlist[vi].id) === String(vals.variant == null ? '' : vals.variant)) variant = vlist[vi];
+  }
+  if (hasV && !variant) return { ok: false, mode: 'fixed', err: 'variant_required', qty: null, amount: 0 };
+  if (variant) svc = { price: variant.price, pricing: variant.pricing, fields: svc.fields };
+
   var P = (svc && svc.pricing && typeof svc.pricing === 'object') ? svc.pricing : {};
   var mode = (P.mode === 'qty' || P.mode === 'formula') ? P.mode : 'fixed';
   var qKey = String(P.qtyKey || 'quantity');
@@ -101,7 +114,7 @@ export function wzPrice(svc, vals, nowMs) {
   var minA = num(P.minAmount, 0), maxA = num(P.maxAmount, 0);
   if (minA > 0 && amount < minA) return fail(mode, 'amount_min', qty);
   if (maxA > 0 && amount > maxA) return fail(mode, 'amount_max', qty);
-  return { ok: true, mode: mode, qty: qty, amount: amount, core: core / 100, addons: add / 100 };
+  return { ok: true, mode: mode, qty: qty, amount: amount, core: core / 100, addons: add / 100, variant: variant ? String(variant.id) : null };
 }
 
 // the browser copy: identical source, defined as a global before the app script runs.
@@ -118,4 +131,14 @@ export function pricingSnapshot(svc, r) {
   for (var i = 0; i < keep.length; i++) if (P[keep[i]] != null) cfg[keep[i]] = P[keep[i]];
   if (r.mode === 'fixed') cfg.price = +(svc && svc.price) || 0;
   return { mode: r.mode, qty: r.qty, core: r.core, addons: r.addons, total: r.amount, cfg: cfg, at: Date.now() };
+}
+
+// server helper: the active sub-product a customer picked (same rule as the engine), or null
+export function variantOf(svc, id) {
+  var list = (svc && Array.isArray(svc.variants)) ? svc.variants : [];
+  for (var i = 0; i < list.length; i++) if (list[i] && list[i].active !== false && String(list[i].id) === String(id == null ? '' : id)) return list[i];
+  return null;
+}
+export function hasVariants(svc) {
+  return !!(svc && Array.isArray(svc.variants) && svc.variants.some(function (v) { return v && v.active !== false; }));
 }
