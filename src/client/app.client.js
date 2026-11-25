@@ -321,22 +321,46 @@
   function viewService(v, id) {
     const s = S.services.find((x) => x.id === id && x.active);
     if (!s) { v.innerHTML = emptyBox(u('services')); return; }
+    const en = S.lang === 'en';
+    const methods = (S.settings.depositMethods || []).filter((m) => (m.numbers || []).some((n) => n.number));
     v.innerHTML = `
       <div class="ph"><button class="back" data-back>${icon('left')}</button><div><h2>${esc(t(s.name))}</h2><div class="sub">${esc(t(s.sub))}</div></div></div>
-      <div class="svc-hero" style="background:linear-gradient(135deg,${svcColor(s)},${svcColor(s)}cc)">
-        <span class="qs-ic">${icon(s.icon || 'bolt')}</span><span class="svc-hero-t"><b>${esc(t(s.name))}</b><br><small>${esc(t(s.sub))}</small></span></div>
       ${t(s.note) ? `<div class="notice"><div class="notice-h">${icon('info')}<span>${u('details')}</span></div><div class="notice-b">${esc(t(s.note))}</div></div>` : ''}
       <div id="ord-err"></div>
-      <form id="svc-form" class="card card-pad">
-        ${(s.fields || []).map(fieldHtml).join('')}
-        ${(s.guideImg || s.guideNote) ? `<div class="guide-box"><div class="guide-h">${icon('info')}<span>${S.lang === 'en' ? 'How to order' : 'কিভাবে অর্ডার করবেন'}</span></div>${s.guideImg ? `<a href="${esc(s.guideImg)}" target="_blank" rel="noopener"><img class="guide-img" src="${esc(s.guideImg)}" alt=""></a>` : ''}${s.guideNote ? `<div class="guide-note">${esc(s.guideNote)}</div>` : ''}</div>` : ''}
+      <form id="svc-form">
+        <div class="card card-pad co-card">
+          <div class="co-sec">${en ? 'Your details' : 'আপনার তথ্য'}</div>
+          ${(s.fields || []).map(fieldHtml).join('')}
+          ${(s.guideImg || s.guideNote) ? `<div class="guide-box"><div class="guide-h">${icon('info')}<span>${en ? 'How to order' : 'কিভাবে অর্ডার করবেন'}</span></div>${s.guideImg ? `<a href="${esc(s.guideImg)}" target="_blank" rel="noopener"><img class="guide-img" src="${esc(s.guideImg)}" alt=""></a>` : ''}${s.guideNote ? `<div class="guide-note">${esc(s.guideNote)}</div>` : ''}</div>` : ''}
+        </div>
+        <div class="card card-pad co-card">
+          <div class="co-sec">${en ? 'Payment method' : 'পেমেন্ট মেথড'}</div>
+          <div class="pay-opts">
+            <button type="button" class="pay-opt" data-pay="wallet"><span class="pay-ic">${icon('wallet')}</span><b>${en ? 'Wallet' : 'ওয়ালেট'}</b><small class="pay-wbal"></small></button>
+            <button type="button" class="pay-opt" data-pay="direct"><span class="pay-ic">${icon('card')}</span><b>${en ? 'Direct' : 'ডাইরেক্ট'}</b><small>bKash, Nagad…</small></button>
+          </div>
+          <div id="pay-direct" style="display:none">
+            <div class="pay-note">${en ? 'Send the order amount to one of these, then enter the TrxID. Admin verifies & delivers.' : 'নিচের যেকোনো নম্বরে অর্ডার অ্যামাউন্ট সেন্ড মানি করে TrxID দিন। এডমিন ভেরিফাই করে ডেলিভার করবে।'}</div>
+            ${methods.length ? `<div class="pm-list">${methods.map((m) => (m.numbers || []).filter((n) => n.number).map((n) => `<label class="pm-opt"><input type="radio" name="dmethod" value="${esc(m.label + ' (' + n.number + ')')}"><span class="pm-main"><b>${esc(m.label)}</b>${n.type ? `<em>${esc(n.type)}</em>` : ''}<code>${esc(n.number)}</code></span><span class="pm-copy" data-copy="${esc(n.number)}">${icon('copy')}</span></label>`).join('')).join('')}</div>` : `<div class="muted" style="font-size:12.5px">${en ? 'No payment numbers set yet.' : 'এখনো পেমেন্ট নম্বর সেট করা হয়নি।'}</div>`}
+            <div class="field"><label>TrxID <span class="req">*</span></label><input name="dtrxid" maxlength="40" placeholder="TrxID"></div>
+          </div>
+          <input type="hidden" name="payVia" value="wallet">
+        </div>
         <div class="total-box"><span class="t">${u('total')}</span><span class="v" id="ord-total">${money(0)}</span></div>
-        <button class="btn" type="submit">${icon('check')}${u('orderNow')}</button>
+        <button class="btn" type="submit">${icon('check')}${en ? 'Buy now' : 'অর্ডার করুন'}</button>
       </form>
       <div style="height:10px"></div>`;
     const form = $('#svc-form');
-    const recalc = () => { $('#ord-total').textContent = money(calcPrice(s, formVals(form))); };
+    const walletBal = S.user.balance || 0;
+    const recalc = () => {
+      const total = calcPrice(s, formVals(form));
+      $('#ord-total').textContent = money(total);
+      const wb = $('.pay-wbal'); if (wb) wb.innerHTML = (total > 0 && walletBal < total) ? `<span class="pay-low">${en ? 'Low balance' : 'ব্যালেন্স কম'}</span>` : money(walletBal);
+    };
+    const selectPay = (mode) => { form.querySelector('[name=payVia]').value = mode; form.querySelectorAll('.pay-opt').forEach((b) => b.classList.toggle('on', b.dataset.pay === mode)); const pd = $('#pay-direct'); if (pd) pd.style.display = mode === 'direct' ? '' : 'none'; };
+    form.querySelectorAll('.pay-opt').forEach((b) => b.addEventListener('click', () => selectPay(b.dataset.pay)));
     form.addEventListener('input', recalc); form.addEventListener('change', recalc); recalc();
+    selectPay(walletBal <= 0 ? 'direct' : 'wallet');
     // package tiles: tap to select, fills the hidden input
     form.querySelectorAll('[data-pk]').forEach((btn) => btn.addEventListener('click', () => {
       const key = btn.dataset.pk;
@@ -388,16 +412,30 @@
     return Math.round(a);
   }
   async function placeOrder(s, form) {
+    const en = S.lang === 'en';
     const vals = formVals(form); const errEl = $('#ord-err');
     for (const f of s.fields || []) if (f.required && !vals[f.key]) { errEl.innerHTML = `<div class="err-msg">${u('fillAll')}</div>`; return; }
     const amount = calcPrice(s, vals);
     if (amount <= 0) { errEl.innerHTML = `<div class="err-msg">${u('fillAll')}</div>`; return; }
-    if (S.user.balance < amount) { errEl.innerHTML = `<div class="err-msg">${u('lowBalance')}</div>`; return; }
+    const payVia = vals.payVia || 'wallet';
+    const payload = { svcId: s.id, fields: vals, payVia };
+    if (payVia === 'direct') {
+      if (!vals.dmethod) { errEl.innerHTML = `<div class="err-msg">${en ? 'Choose a payment number above' : 'উপরে একটি পেমেন্ট নম্বর বাছুন'}</div>`; return; }
+      if (!vals.dtrxid || vals.dtrxid.trim().length < 4) { errEl.innerHTML = `<div class="err-msg">${en ? 'Enter a valid TrxID' : 'সঠিক TrxID দিন'}</div>`; return; }
+      payload.method = vals.dmethod; payload.trxid = vals.dtrxid.trim();
+    } else if (S.user.balance < amount) {
+      errEl.innerHTML = `<div class="err-msg">${u('lowBalance')} — ${en ? 'use Direct bKash/Nagad below' : 'নিচে ডাইরেক্ট bKash/Nagad দিন'}</div>`; return;
+    }
     const btn = $('#svc-form .btn'); btn.disabled = true;
-    const r = await api('/api/order', { svcId: s.id, fields: vals });
+    const r = await api('/api/order', payload);
     btn.disabled = false;
-    if (r.ok) { S.user.balance = r.balance; toast(u('orderPlaced') + ' • ' + r.order.id); location.hash = '#orders'; await loadHome(); render(); }
-    else if (r.error === 'balance') { errEl.innerHTML = `<div class="err-msg">${u('lowBalance')}</div>`; }
+    if (r.ok) {
+      if (typeof r.balance === 'number') S.user.balance = r.balance;
+      toast((payVia === 'direct' ? (en ? 'Order placed — payment will be verified' : 'অর্ডার হয়েছে — পেমেন্ট যাচাই হবে') : u('orderPlaced')) + ' • ' + r.order.id);
+      location.hash = '#orders'; await loadHome(); render();
+    }
+    else if (r.error === 'balance') { errEl.innerHTML = `<div class="err-msg">${u('lowBalance')} — ${en ? 'use Direct bKash/Nagad' : 'ডাইরেক্ট bKash/Nagad দিন'}</div>`; }
+    else if (r.error === 'pay') { errEl.innerHTML = `<div class="err-msg">${en ? 'Enter a valid TrxID' : 'সঠিক TrxID দিন'}</div>`; }
     else { errEl.innerHTML = `<div class="err-msg">${u('fillAll')}</div>`; }
   }
 

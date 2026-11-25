@@ -805,6 +805,29 @@ select option{background:#141922;color:var(--lx-ink)}
 .svc-hero small{font-size:11.5px}
 .svc-hero .qs-ic{width:40px!important;height:40px!important}
 .svc-hero .qs-ic .ic{width:21px;height:21px}
+/* clean checkout: section labels + payment method cards */
+.co-card{margin-bottom:12px}
+.co-sec{font-family:var(--disp);font-weight:800;font-size:12.5px;letter-spacing:.03em;color:var(--lx-gold);text-transform:uppercase;margin-bottom:13px;display:flex;align-items:center;gap:8px}
+.co-sec::before{content:"";width:4px;height:15px;border-radius:3px;background:var(--gold-g);flex:none}
+.pay-opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pay-opt{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:3px;padding:12px;border-radius:14px;border:1.5px solid var(--lx-line,#2a2f3a);background:#141922;transition:border-color .15s,box-shadow .2s}
+.pay-opt b{font-size:14px;color:var(--lx-ink,#f2f0ea)}
+.pay-opt small{font-size:11.5px;color:var(--lx-sub,#a7a299)}
+.pay-opt.on{border-color:var(--lx-gold);box-shadow:0 0 0 1.5px var(--lx-gold) inset}
+.pay-ic{display:inline-flex;color:var(--lx-gold);margin-bottom:2px}
+.pay-ic .ic{width:20px;height:20px}
+.pay-low{color:#ef6a6a;font-weight:700}
+.pay-note{font-size:12px;color:var(--lx-sub,#a7a299);margin:13px 0 11px;line-height:1.5}
+.pm-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.pm-opt{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:1.5px solid var(--lx-line,#2a2f3a);background:#141922;cursor:pointer}
+.pm-opt input{accent-color:var(--lx-gold);width:auto;flex:none;margin:0}
+.pm-opt:has(input:checked){border-color:var(--lx-gold);background:rgba(232,195,121,.08)}
+.pm-main{flex:1;min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pm-main b{font-size:13.5px;color:var(--lx-ink,#f2f0ea)}
+.pm-main em{font-style:normal;font-size:10.5px;color:var(--lx-sub,#a7a299);background:rgba(255,255,255,.06);padding:1px 7px;border-radius:999px}
+.pm-main code{font-size:13px;color:var(--lx-gold);font-weight:700}
+.pm-copy{flex:none;color:var(--lx-sub,#a7a299);cursor:pointer;display:inline-flex}
+.pm-copy .ic{width:17px;height:17px}
 .cat-tab{all:unset;cursor:pointer;white-space:nowrap;font-size:12.5px;font-weight:700;padding:8px 15px;border-radius:999px;color:var(--lx-sub);background:var(--lx-card);border:1px solid var(--lx-line);transition:background .18s,color .18s,transform .12s}
 .cat-tab.on{color:#1a1206;background:var(--gold-g);border-color:transparent;box-shadow:0 10px 20px -10px rgba(201,153,47,.6)}
 .cat-tab:active{transform:scale(.95)}

@@ -177,7 +177,7 @@ function computeOrder(svc, fields) {
 }
 
 /* ---------------- per-product auto-delivery via external API ---------------- */
-const orderMeta = (o) => ({ id: o.id, uid: o.uid, status: o.status, ts: o.ts, n: o.svcName, un: maskName(o.uname), amt: o.amount, cat: o.cat });
+const orderMeta = (o) => ({ id: o.id, uid: o.uid, status: o.status, ts: o.ts, n: o.svcName, un: maskName(o.uname), amt: o.amount, cat: o.cat, pay: o.payVia || 'wallet' });
 function apiSubst(tpl, order, secrets) {
   return String(tpl == null ? '' : tpl)
     .replace(/\{\{(\w+)\}\}/g, (_, k) => String((secrets && secrets[k]) != null ? secrets[k] : ''))
@@ -311,29 +311,42 @@ async function handleApi(req, env, url, path, u, secure) {
     const r = computeOrder(svc, b.fields || {});
     if (r.error) return json({ ok: false, error: 'field', field: r.error }, 400);
     if (r.amount <= 0) return json({ ok: false, error: 'amount' }, 400);
-    // re-read the user fresh to avoid stale balance
-    const fresh = await env.DATA.get('u:' + u.id, 'json');
-    if ((fresh.balance || 0) < r.amount) return json({ ok: false, error: 'balance', need: r.amount, have: fresh.balance || 0 }, 400);
-    fresh.balance = Math.round((fresh.balance || 0) - r.amount);
+    const direct = b.payVia === 'direct';
     const ts = now(), id = 'WF' + String(ts).slice(-8) + rid(3).toUpperCase();
-    const order = { id, uid: u.id, uname: u.name, svcId: svc.id, svcName: svc.name, cat: svc.cat, fields: r.clean, amount: r.amount, status: 'pending', note: '', ts };
+    const order = { id, uid: u.id, uname: u.name, svcId: svc.id, svcName: svc.name, cat: svc.cat, fields: r.clean, amount: r.amount, status: 'pending', note: '', ts, payVia: direct ? 'direct' : 'wallet' };
     const key = 'o:' + sortKey(ts);
-    // auto-delivery: call the provider API immediately after payment
-    if (svc.api && svc.api.on && svc.api.url) {
-      const res = await runProductApi(order, svc, settings);
-      const retry = apiRetryable(res);
-      order.api = { state: res.ok ? 'ok' : (retry ? 'queued' : 'failed'), extId: res.extId || '', resp: res.resp, error: res.error || '', status: res.status || 0, attempts: 1, nextTs: (res.ok || !retry) ? 0 : ts + 60000 };
-      if (res.ok) order.status = svc.api.doneOnOk ? 'done' : 'processing';
+    let outBalance;
+    if (direct) {
+      // pay the order amount directly via bKash/Nagad; admin verifies payment then approves
+      const method = clip(b.method, 24), trxid = clip(b.trxid, 40), sender = clip(b.sender, 14);
+      if (!method || trxid.length < 4) return json({ ok: false, error: 'pay' }, 400);
+      order.pay = { method, trxid, sender };
+      await env.DATA.put(key, JSON.stringify(order), { metadata: orderMeta(order) });
+      const me = await env.DATA.get('u:' + u.id, 'json');
+      outBalance = me ? me.balance : undefined;
+    } else {
+      // wallet: re-read the user fresh to avoid stale balance, then deduct
+      const fresh = await env.DATA.get('u:' + u.id, 'json');
+      if ((fresh.balance || 0) < r.amount) return json({ ok: false, error: 'balance', need: r.amount, have: fresh.balance || 0 }, 400);
+      fresh.balance = Math.round((fresh.balance || 0) - r.amount);
+      // auto-delivery: call the provider API immediately after payment
+      if (svc.api && svc.api.on && svc.api.url) {
+        const res = await runProductApi(order, svc, settings);
+        const retry = apiRetryable(res);
+        order.api = { state: res.ok ? 'ok' : (retry ? 'queued' : 'failed'), extId: res.extId || '', resp: res.resp, error: res.error || '', status: res.status || 0, attempts: 1, nextTs: (res.ok || !retry) ? 0 : ts + 60000 };
+        if (res.ok) order.status = svc.api.doneOnOk ? 'done' : 'processing';
+      }
+      await env.DATA.put('u:' + u.id, JSON.stringify(fresh));
+      await env.DATA.put(key, JSON.stringify(order), { metadata: orderMeta(order) });
+      outBalance = fresh.balance;
     }
-    await env.DATA.put('u:' + u.id, JSON.stringify(fresh));
-    await env.DATA.put(key, JSON.stringify(order), { metadata: orderMeta(order) });
     await pushLive(env, order);
     const ul = (await env.DATA.get('uo:' + u.id, 'json')) || [];
     ul.unshift({ key, id, status: order.status, ts, svcName: svc.name, amount: r.amount });
     await env.DATA.put('uo:' + u.id, JSON.stringify(ul.slice(0, 100)));
     if (order.api && order.api.state === 'queued') await apiqAdd(env, key);
     await bumpStat(env, 'orders');
-    return json({ ok: true, order: { id, amount: r.amount, status: order.status }, balance: fresh.balance });
+    return json({ ok: true, order: { id, amount: r.amount, status: order.status }, balance: outBalance });
   }
 
   if (path === '/api/orders') {
@@ -572,15 +585,26 @@ async function handleAdmin(req, env, url, path, u) {
     const o = await env.DATA.get(clip(b.key, 60), 'json');
     if (!o) return json({ ok: false, error: 'not_found' }, 404);
     const st = ['pending', 'processing', 'done', 'rejected'].includes(b.status) ? b.status : o.status;
-    // refund on reject (once)
-    if (st === 'rejected' && o.status !== 'rejected') {
+    // refund on reject (once) — ONLY wallet orders; direct bKash/Nagad orders were not paid from wallet
+    if (st === 'rejected' && o.status !== 'rejected' && o.payVia !== 'direct') {
       const owner = await env.DATA.get('u:' + o.uid, 'json');
       if (owner) { owner.balance = Math.round((owner.balance || 0) + o.amount); await env.DATA.put('u:' + o.uid, JSON.stringify(owner)); }
     }
     o.status = st; o.note = clip(b.note, 1000); o.respImg = safeImg(b.respImg);
-    await env.DATA.put(b.key, JSON.stringify(o), { metadata: { id: o.id, uid: o.uid, status: st, ts: o.ts, n: o.svcName, un: maskName(o.uname), amt: o.amount, cat: o.cat } });
+    // direct-payment order being approved: run auto-delivery now (payment verified by admin)
+    if (o.payVia === 'direct' && (st === 'processing' || st === 'done') && !(o.api && o.api.extId)) {
+      const svc = (await getServices(env)).find((s) => s.id === o.svcId);
+      if (svc && svc.api && svc.api.on && svc.api.url) {
+        const res = await runProductApi(o, svc, await getSettings(env));
+        const retry = apiRetryable(res);
+        o.api = { state: res.ok ? 'ok' : (retry ? 'queued' : 'failed'), extId: res.extId || '', resp: res.resp, error: res.error || '', status: res.status || 0, attempts: 1, nextTs: (res.ok || !retry) ? 0 : now() + 60000 };
+        if (res.ok) o.status = svc.api.doneOnOk ? 'done' : 'processing';
+        if (o.api.state === 'queued') await apiqAdd(env, b.key);
+      }
+    }
+    await env.DATA.put(b.key, JSON.stringify(o), { metadata: orderMeta(o) });
     await syncUserOrder(env, o);
-    return json({ ok: true });
+    return json({ ok: true, status: o.status });
   }
 
   if (path === '/api/admin/deposits') {

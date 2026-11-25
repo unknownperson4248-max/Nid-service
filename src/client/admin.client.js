@@ -101,6 +101,13 @@
     modal(`Order ${esc(o.id)}`, `
       <div class="flex" style="margin-bottom:10px">${badge(o.status)}<span class="pill">${new Date(o.ts).toLocaleString('en-GB')}</span></div>
       <div class="kvs"><div><span class="k">Customer:</span> <b>${esc(o.uname)}</b></div><div><span class="k">Service:</span> <b>${esc(tl(o.svcName))}</b></div><div><span class="k">Amount:</span> <b>${money(o.amount)}</b></div>${rows}</div>
+      ${o.payVia === 'direct' ? `<div class="field" style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:10px">
+        <div class="flex" style="justify-content:space-between"><b>💳 Direct payment (bKash/Nagad)</b><span class="badge">verify</span></div>
+        <div style="font-size:13px;margin-top:6px">Sent to: <b>${esc((o.pay && o.pay.method) || '-')}</b></div>
+        <div style="font-size:13px;margin-top:3px">TrxID: <b class="mono">${esc((o.pay && o.pay.trxid) || '-')}</b></div>
+        ${o.pay && o.pay.sender ? `<div style="font-size:12px;margin-top:3px">From: <b>${esc(o.pay.sender)}</b></div>` : ''}
+        <div class="muted" style="font-size:11px;margin-top:6px">Verify this payment, then set status to <b>processing/done</b> — auto-delivery (if any) runs on approval.</div>
+      </div>` : ''}
       ${o.api ? `<div class="field" style="background:#f3f6f5;border:1px solid var(--line);border-radius:10px;padding:10px">
         <div class="flex" style="justify-content:space-between"><b>Auto-delivery (API)</b><span class="badge ${o.api.state === 'ok' ? 'b-approved' : o.api.state === 'failed' ? 'b-rejected' : ''}">${esc(o.api.state || '')}</span></div>
         ${o.api.extId ? `<div class="muted" style="font-size:12px;margin-top:5px">External ID: <b class="mono">${esc(o.api.extId)}</b></div>` : ''}
