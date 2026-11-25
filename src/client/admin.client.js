@@ -378,6 +378,12 @@
         <div id="f-api-detail" style="${(s.api && s.api.on) ? '' : 'display:none'};margin-top:10px">
           <div class="flex" style="margin-bottom:10px"><span class="muted" style="font-size:12px">1-click setup:</span><button type="button" class="btn btn-ghost btn-sm" data-apipreset="ffglory">ffglory (Glory)</button><button type="button" class="btn btn-ghost btn-sm" data-apipreset="smm">SMM panel</button></div>
           <label class="flex" style="gap:6px;margin:0 0 6px"><input type="checkbox" id="f-api-done" ${(s.api && s.api.doneOnOk) ? 'checked' : ''} style="width:auto"> Mark order <b>Done</b> on success (else <b>Processing</b>)</label>
+          <label class="flex" style="gap:6px;margin:0 0 6px"><input type="checkbox" id="f-api-track" ${(s.api && s.api.track) ? 'checked' : ''} style="width:auto"> Track status from provider <span class="muted" style="font-size:11.5px">(SMM: Completed → Done, Partial/Canceled → auto refund)</span></label>
+          <div class="grid2" style="margin-top:8px">
+            <div class="field"><label>Request format</label><select id="f-api-format"><option value="json" ${(s.api && s.api.format) === 'form' ? '' : 'selected'}>JSON</option><option value="form" ${(s.api && s.api.format) === 'form' ? 'selected' : ''}>Form (SMM panels)</option></select></div>
+            <div class="field"><label>Provider service ID</label><input id="f-svc-provid" value="${esc(s.serviceId || '')}" placeholder="e.g. 567 · used as {service}"><div class="muted" style="font-size:11px">Sub-products use their own ID.</div></div>
+          </div>
+          <div class="flex" style="margin:2px 0 8px"><button type="button" class="btn btn-ghost btn-sm" id="f-api-bal">${icon('wallet')}Check panel balance</button><span class="muted" id="f-api-balout" style="font-size:12.5px"></span></div>
           <details style="margin-top:6px"><summary class="muted" style="font-size:12px;cursor:pointer">Advanced request settings</summary>
             <div class="muted" style="font-size:11px;margin:8px 0">Use <code>{boxkey}</code> for an order box value, <code>{{SECRET}}</code> for a saved key (Settings → API keys).</div>
             <div class="grid2">
@@ -388,6 +394,7 @@
             <div class="field"><label>Query params (JSON)</label><input id="f-api-query" value="${esc((s.api && s.api.query) || '')}" placeholder='{"api_key":"{{FFGLORY_KEY}}"}'></div>
             <div class="field"><label>Headers (JSON)</label><input id="f-api-headers" value="${esc((s.api && s.api.headers) || '')}" placeholder='{"x-api-key":"{{FFGLORY_MKEY}}"}'></div>
             <div class="field"><label>Body (JSON)</label><textarea id="f-api-body" rows="3" placeholder='{"region":"{region}","clan_id":"{clan_id}"}'>${esc((s.api && s.api.body) || '')}</textarea></div>
+            <div class="field"><label>Status request body (for tracking)</label><textarea id="f-api-sbody" rows="2" placeholder='{"key":"{{SMM_KEY}}","action":"status","order":"{extId}"}'>${esc((s.api && s.api.statusBody) || '')}</textarea></div>
           </details>
         </div>
       </div>`,
@@ -395,6 +402,13 @@
     $('#svc-save').addEventListener('click', saveService);
     wirePricing();
     if ((editing.variants || []).length) renderVariants();
+    const balBtn = $('#f-api-bal'); if (balBtn) balBtn.addEventListener('click', async () => {
+      const out = $('#f-api-balout'); out.textContent = 'Checking…';
+      const r = await api('/api/admin/api-balance', { url: $('#f-api-url').value.trim(), format: $('#f-api-format').value, headers: $('#f-api-headers').value, body: $('#f-api-body').value });
+      const d = r.resp || {};
+      out.textContent = r.ok ? `Balance: ${d.balance} ${d.currency || ''}` : `Failed: ${(d && d.error) || r.error || ('http ' + (r.status || ''))}`;
+      out.style.color = r.ok ? '#15803d' : '#dc2626';
+    });
     const apiOn = $('#f-api-on'); const apiDetail = $('#f-api-detail');
     if (apiOn && apiDetail) apiOn.addEventListener('change', () => { apiDetail.style.display = apiOn.checked ? '' : 'none'; });
     document.querySelectorAll('[data-apipreset]').forEach((bb) => bb.addEventListener('click', () => {
@@ -407,10 +421,12 @@
         if (!editing.fields.some((f) => f.key === 'clan_id')) editing.fields.push({ key: 'clan_id', type: 'text', required: true, label: { bn: 'ক্লান আইডি (UID)', en: 'Clan ID' }, ph: '123456789' });
         toast('ffglory ready ✓ region + Clan ID boxes added');
       } else {
-        editing.api = { on: true, method: 'POST', url: 'https://YOUR-SMM-PANEL.com/api/v2', query: '', headers: '', body: '{"key":"{{SMM_KEY}}","action":"add","service":"SERVICE_ID","link":"{link}","quantity":"{quantity}"}', idPath: 'order' };
+        editing.api = { on: true, doneOnOk: false, track: true, format: 'form', method: 'POST', url: 'https://my.smm-panel.com/api/v2', query: '', headers: '', body: '{"key":"{{SMM_KEY}}","action":"add","service":"{service}","link":"{link}","quantity":"{quantity}"}', statusBody: '{"key":"{{SMM_KEY}}","action":"status","order":"{extId}"}', idPath: 'order' };
         if (!editing.fields.some((f) => f.key === 'link')) editing.fields.push({ key: 'link', type: 'text', required: true, label: { bn: 'লিংক', en: 'Link' }, ph: 'https://...' });
-        if (!editing.fields.some((f) => f.key === 'quantity')) editing.fields.push({ key: 'quantity', type: 'number', required: true, label: { bn: 'পরিমাণ', en: 'Quantity' }, min: 1 });
-        toast('SMM preset ✓ edit URL + SERVICE_ID');
+        // quantity is entered through the pricing system, so an old plain quantity box is not needed
+        editing.fields = editing.fields.filter((f) => !(f.key === 'quantity' && f.type === 'number'));
+        if (!(editing.variants || []).length && !(editing.pricing && editing.pricing.mode === 'qty')) editing.pricing = { ...(editing.pricing || {}), mode: 'qty', qtyKey: 'quantity', baseQty: 1000, minQty: 100, step: 1 };
+        toast('SMM ready ✓ add sub-products (or a service ID) + save key SMM_KEY');
       }
       svcModal();
     }));
@@ -422,7 +438,8 @@
     const gdel = $('#f-gimgdel'); if (gdel) gdel.addEventListener('click', () => { readFieldsFromDom(); syncSvcText(); editing.guideImg = ''; svcModal(); });
   }
   function syncSvcText() { const g = (id) => { const el = $(id); return el ? el.value : undefined; }; const n = g('#f-name'); if (n !== undefined) editing.name = n.trim(); const sb = g('#f-sub'); if (sb !== undefined) editing.sub = sb.trim(); const no = g('#f-note'); if (no !== undefined) editing.note = no.trim(); const cat = g('#f-cat'); if (cat !== undefined) editing.cat = cat; const ic = g('#f-icon'); if (ic !== undefined) editing.icon = ic; const col = g('#f-color'); if (col !== undefined) editing.color = col; const pr = g('#f-price'); if (pr !== undefined) editing.price = Number(pr) || 0; const ac = $('#f-active'); if (ac) editing.active = ac.checked; const fe = $('#f-featured'); if (fe) editing.featured = fe.checked; const gn = $('#f-gnote'); if (gn) editing.guideNote = gn.value.trim(); if ($('#f-pmode')) editing.pricing = readPricing(); readVariants();
-    const ao = $('#f-api-on'); if (ao) { editing.api = editing.api || {}; editing.api.on = ao.checked; editing.api.doneOnOk = $('#f-api-done') ? $('#f-api-done').checked : !!editing.api.doneOnOk; editing.api.method = (g('#f-api-method') || 'POST'); editing.api.url = (g('#f-api-url') || '').trim(); editing.api.query = (g('#f-api-query') || '').trim(); editing.api.headers = (g('#f-api-headers') || '').trim(); editing.api.body = (g('#f-api-body') || '').trim(); editing.api.idPath = (g('#f-api-idpath') || '').trim(); } }
+    const pid = $('#f-svc-provid'); if (pid) editing.serviceId = pid.value.trim();
+    const ao = $('#f-api-on'); if (ao) { editing.api = editing.api || {}; editing.api.on = ao.checked; editing.api.track = !!($('#f-api-track') && $('#f-api-track').checked); editing.api.format = ($('#f-api-format') || {}).value === 'form' ? 'form' : 'json'; if ($('#f-api-sbody')) editing.api.statusBody = $('#f-api-sbody').value.trim(); editing.api.doneOnOk = $('#f-api-done') ? $('#f-api-done').checked : !!editing.api.doneOnOk; editing.api.method = (g('#f-api-method') || 'POST'); editing.api.url = (g('#f-api-url') || '').trim(); editing.api.query = (g('#f-api-query') || '').trim(); editing.api.headers = (g('#f-api-headers') || '').trim(); editing.api.body = (g('#f-api-body') || '').trim(); editing.api.idPath = (g('#f-api-idpath') || '').trim(); } }
   async function uploadImage(e) {
     const file = e.target.files[0]; if (!file) return;
     if (file.size > 2 * 1024 * 1024) { toast('Image too big (max 2MB)'); return; }

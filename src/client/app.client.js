@@ -310,7 +310,7 @@
     S.services.filter((s) => s.active).forEach((s) => {
       const opts = (s.fields || []).find((f) => f.type === 'select' && (f.options || []).some((o) => typeof o.price === 'number'));
       const pm = pricingOf(s);
-      if (variantsOf(s).length) variantsOf(s).forEach((x) => { const xp = x.pricing || {}; rows.push([`${t(s.name)} — ${x.name}${xp.mode === 'qty' ? ' (' + (+xp.baseQty || 0).toLocaleString('en-US') + ')' : ''}`, xp.mode === 'qty' ? +xp.basePrice || 0 : +x.price || 0]); });
+      if (variantsOf(s).length) variantsOf(s).forEach((x) => { const xp = x.pricing || {}; rows.push([xp.mode === 'qty' ? `${(+xp.baseQty || 0).toLocaleString('en-US')} ${x.name}` : x.name, xp.mode === 'qty' ? +xp.basePrice || 0 : +x.price || 0]); });
       else if (pm.mode === 'qty') rows.push([`${t(s.name)} — ${(+pm.P.baseQty || 0).toLocaleString('en-US')}`, +pm.P.basePrice || 0]);
       else if (opts) opts.options.filter((o) => typeof o.price === 'number').slice(0, 6).forEach((o) => rows.push([`${t(s.name)} — ${o.label}`, o.price]));
       else rows.push([t(s.name), svcMinPrice(s)]);
@@ -443,8 +443,11 @@
   function calcPrice(s, vals) { const r = wzPrice(s, vals); return r.ok ? r.amount : 0; }
   // sub-products (variants): each has its own price config; same pick rule as the engine
   const variantsOf = (s) => ((s && s.variants) || []).filter((x) => x && x.active !== false);
-  const effOf = (s, vid) => { const x = variantsOf(s).find((y) => String(y.id) === String(vid == null ? '' : vid)); return x ? { ...s, price: x.price, pricing: x.pricing } : s; };
-  const variantRate = (x) => { const P = x.pricing || {}; return P.mode === 'qty' ? `${money(+P.basePrice || 0)} / ${(+P.baseQty || 0).toLocaleString('en-US')}` : money(+x.price || 0); };
+  const effOf = (s, vid) => { const x = variantsOf(s).find((y) => String(y.id) === String(vid == null ? '' : vid)); return x ? { ...s, price: x.price, pricing: x.pricing, _unitName: x.name } : s; };
+  // "1,000 Followers = ৳70": the unit is the last word of the name (Facebook Followers -> Followers)
+  const unitOf = (name) => { const w = String(t(name) || '').trim().split(/\s+/).filter(Boolean); return w.length > 1 ? w[w.length - 1] : (w[0] || ''); };
+  const rateText = (P, name) => `${(+P.baseQty || 0).toLocaleString('en-US')} ${unitOf(name)} = ${money(+P.basePrice || 0)}`.replace(/\s+=/, ' =');
+  const variantRate = (x) => { const P = x.pricing || {}; return P.mode === 'qty' ? rateText(P, x.name) : money(+x.price || 0); };
   const pricingOf = (s) => { const P = (s && s.pricing) || {}; const mode = (P.mode === 'qty' || P.mode === 'formula') ? P.mode : 'fixed'; return { P, mode, qKey: String(P.qtyKey || 'quantity'), needQty: mode === 'qty' || (mode === 'formula' && !!P.useQty) }; };
   function qtyErrText(code, P) {
     const en = S.lang === 'en'; const minQ = Math.max(1, Math.floor(+P.minQty || 0)), maxQ = Math.floor(+P.maxQty || 0), step = Math.max(1, Math.floor(+P.step || 1));
@@ -459,7 +462,7 @@
   function qtyBoxHtml(s) {
     const { P, mode, qKey, needQty } = pricingOf(s); if (!needQty) return '';
     const en = S.lang === 'en'; const minQ = Math.max(1, Math.floor(+P.minQty || 0)), maxQ = Math.floor(+P.maxQty || 0), step = Math.max(1, Math.floor(+P.step || 1));
-    const rate = mode === 'qty' ? `${money(+P.basePrice || 0)} / ${(+P.baseQty || 0).toLocaleString('en-US')}` : '';
+    const rate = mode === 'qty' ? rateText(P, s._unitName || s.name) : '';
     const lims = [`${en ? 'Minimum order' : 'সর্বনিম্ন অর্ডার'}: <b>${minQ.toLocaleString('en-US')}</b>`, maxQ > 0 ? `${en ? 'Maximum order' : 'সর্বোচ্চ অর্ডার'}: <b>${maxQ.toLocaleString('en-US')}</b>` : '', step > 1 ? `${en ? 'Step' : 'ধাপ'}: ${step.toLocaleString('en-US')}` : ''].filter(Boolean).join(' · ');
     return `<div class="field qty-field"><label>${esc(P.qtyLabel || (en ? 'Quantity' : 'পরিমাণ'))} <span class="req">*</span></label>
       <input name="${esc(qKey)}" type="number" inputmode="numeric" min="${minQ}" ${maxQ > 0 ? `max="${maxQ}"` : ''} step="${step}" placeholder="${minQ}" required>

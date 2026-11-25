@@ -199,7 +199,8 @@ function apiSubst(tpl, order, secrets) {
     .replace(/\{(\w+)\}/g, (_, k) => {
       if (k === 'amount' || k === 'total') return String(order.amount);
       if (k === 'orderId') return String(order.id);
-      if (k === 'service' && order.variant && order.variant.serviceId) return String(order.variant.serviceId); // per sub-product provider service id
+      if (k === 'service') return String((order.variant && order.variant.serviceId) || order.provService || ''); // sub-product id, else product id
+      if (k === 'extId') return String((order.api && order.api.extId) || '');
       const v = order.fields && order.fields[k];
       return v == null ? '' : String(v);
     });
@@ -213,33 +214,98 @@ function parseApiBody(text) {
   for (const m of text.matchAll(/data:\s*(\{.*\})\s*$/gm)) { try { best = JSON.parse(m[1]); } catch {} }
   return best != null ? best : text;
 }
+// fill a template: if it is a JSON object, substitute value by value (customer text can't break
+// out of a value); otherwise substitute the raw string
+function fillTemplate(tpl, order, secrets) {
+  const deep = (v) => (typeof v === 'string' ? apiSubst(v, order, secrets) : Array.isArray(v) ? v.map(deep) : (v && typeof v === 'object') ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, deep(x)])) : v);
+  try { const obj = JSON.parse(String(tpl)); if (obj && typeof obj === 'object') return { obj: deep(obj) }; } catch {}
+  return { raw: apiSubst(tpl, order, secrets) };
+}
+async function callProvider(a, tpl, order, settings) {
+  const secrets = settings.apiSecrets || {};
+  const method = (a.method || 'POST').toUpperCase();
+  const form = a.format === 'form';
+  let url = apiSubst(a.url, order, secrets);
+  if (a.query) { try { const q = JSON.parse(apiSubst(a.query, order, secrets)); const uu = new URL(url); for (const k in q) uu.searchParams.set(k, q[k]); url = uu.toString(); } catch {} }
+  const headers = { 'content-type': form ? 'application/x-www-form-urlencoded' : 'application/json' };
+  if (a.headers) { try { Object.assign(headers, JSON.parse(apiSubst(a.headers, order, secrets))); } catch {} }
+  const init = { method, headers };
+  if (method !== 'GET' && tpl) {
+    const f = fillTemplate(tpl, order, secrets);
+    if (f.obj) init.body = form ? new URLSearchParams(Object.entries(f.obj).map(([k, v]) => [k, v == null ? '' : String(v)])).toString() : JSON.stringify(f.obj);
+    else init.body = f.raw;
+  }
+  const rr = await fetch(url, init);
+  const text = await rr.text();
+  return { rr, data: parseApiBody(text) };
+}
 async function runProductApi(order, svc, settings) {
   const a = svc.api || {};
   if (!a.on || !a.url) return { ok: false, error: 'noapi' };
-  const secrets = settings.apiSecrets || {};
-  const method = (a.method || 'POST').toUpperCase();
-  let url = apiSubst(a.url, order, secrets);
-  if (a.query) { try { const q = JSON.parse(apiSubst(a.query, order, secrets)); const uu = new URL(url); for (const k in q) uu.searchParams.set(k, q[k]); url = uu.toString(); } catch {} }
-  const headers = { 'content-type': 'application/json' };
-  if (a.headers) { try { Object.assign(headers, JSON.parse(apiSubst(a.headers, order, secrets))); } catch {} }
-  const init = { method, headers };
-  if (method !== 'GET' && a.body) init.body = apiSubst(a.body, order, secrets);
   try {
-    const rr = await fetch(url, init);
-    const text = await rr.text();
-    const data = parseApiBody(text);
+    const { rr, data } = await callProvider(a, a.body, order, settings);
     const extId = a.idPath ? getByPath(data, a.idPath) : undefined;
     const okFlag = rr.ok && (a.idPath ? (extId != null && extId !== '') : true);
-    return { ok: okFlag, status: rr.status, extId: extId != null ? String(extId) : '', resp: typeof data === 'string' ? data.slice(0, 600) : data, error: okFlag ? '' : ('http ' + rr.status) };
+    const perr = data && typeof data === 'object' && data.error ? String(data.error).slice(0, 200) : ''; // e.g. SMM: "Not enough funds on balance"
+    return { ok: okFlag, status: rr.status, extId: extId != null ? String(extId) : '', resp: typeof data === 'string' ? data.slice(0, 600) : data, error: okFlag ? '' : (perr || ('http ' + rr.status)) };
   } catch (e) { return { ok: false, error: String((e && e.message) || e).slice(0, 200) }; }
 }
 // retry only transient failures (network error / 5xx / 429); a 4xx (bad auth, limit, bad request) will not fix itself
 const apiRetryable = (r) => !r.ok && (!r.status || r.status >= 500 || r.status === 429);
 async function saveOrderStatus(env, key, order) {
   await env.DATA.put(key, JSON.stringify(order), { metadata: orderMeta(order) });
+  await trackAdd(env, key, order);
   const ul = (await env.DATA.get('uo:' + order.uid, 'json')) || [];
   const i = ul.findIndex((x) => x.id === order.id);
   if (i >= 0) { ul[i].status = order.status; await env.DATA.put('uo:' + order.uid, JSON.stringify(ul)); }
+}
+// provider status tracking (SMM "action=status"): orders that were accepted and are still running
+async function trackAdd(env, okey, order) {
+  if (!order || !order.api || order.api.state !== 'ok' || !order.api.extId || order.status === 'done' || order.status === 'rejected') return;
+  const idx = (await env.DATA.get('smmq_index', 'json')) || [];
+  if (!idx.includes(okey)) { idx.push(okey); await env.DATA.put('smmq_index', JSON.stringify(idx.slice(-500))); }
+}
+async function refundWallet(env, uid, amt) {
+  if (!(amt > 0)) return;
+  const owner = await env.DATA.get('u:' + uid, 'json');
+  if (owner) { owner.balance = Math.round((owner.balance || 0) + amt); await env.DATA.put('u:' + uid, JSON.stringify(owner)); }
+}
+async function pollProviderStatus(env) {
+  const idx = (await env.DATA.get('smmq_index', 'json')) || [];
+  if (!idx.length) return;
+  const [settings, services] = await Promise.all([getSettings(env), getServices(env)]);
+  const t = now(); const drop = []; let checked = 0;
+  for (const okey of idx) {
+    if (checked >= 40) break;
+    const order = await env.DATA.get(okey, 'json');
+    if (!order || !order.api || !order.api.extId || order.status === 'done' || order.status === 'rejected') { drop.push(okey); continue; }
+    if ((order.api.nextCheck || 0) > t) continue;
+    const svc = services.find((x) => x.id === order.svcId);
+    const a = svc && svc.api;
+    if (!a || !a.on || !a.url || !a.track || t - order.ts > 14 * 864e5) { drop.push(okey); continue; }
+    checked++;
+    let st = '', remains = null;
+    try {
+      const { data } = await callProvider(a, a.statusBody || '{"key":"{{SMM_KEY}}","action":"status","order":"{extId}"}', order, settings);
+      st = String((data && data.status) || '').toLowerCase(); remains = data && data.remains != null ? Number(data.remains) : null;
+      order.api.remote = { status: (data && data.status) || (data && data.error) || '', remains, at: t };
+    } catch (e) { order.api.remote = { status: 'check failed', at: t }; }
+    order.api.checks = (order.api.checks || 0) + 1;
+    order.api.nextCheck = t + Math.min(30, 5 + order.api.checks) * 60000;
+    const qty = Number(order.fields && order.fields.quantity) || 0;
+    if (st === 'completed') { order.status = 'done'; drop.push(okey); }
+    else if (st === 'partial') {
+      order.status = 'done';
+      if (!order.refunded && qty > 0 && remains > 0) { const back = Math.round(order.amount * Math.min(remains, qty) / qty); await refundWallet(env, order.uid, back); order.refunded = back; order.note = (order.note ? order.note + '\n' : '') + `Partially delivered — ${remains} not delivered, ৳${back} refunded to wallet.`; }
+      drop.push(okey);
+    } else if (st === 'canceled' || st === 'cancelled' || st === 'refunded') {
+      order.status = 'rejected';
+      if (!order.refunded) { await refundWallet(env, order.uid, order.amount); order.refunded = order.amount; order.note = (order.note ? order.note + '\n' : '') + `Cancelled by provider — ৳${order.amount} refunded to wallet.`; }
+      drop.push(okey);
+    } else if (order.status === 'pending') order.status = 'processing';
+    await saveOrderStatus(env, okey, order);
+  }
+  if (drop.length) { const cur = (await env.DATA.get('smmq_index', 'json')) || []; await env.DATA.put('smmq_index', JSON.stringify(cur.filter((k) => !drop.includes(k)))); }
 }
 // retry queue tracked as a small index array (get), NOT a KV list() — saves list ops
 async function apiqAdd(env, okey) {
@@ -332,6 +398,7 @@ async function handleApi(req, env, url, path, u, secure) {
     const order = { id, uid: u.id, uname: u.name, svcId: svc.id, svcName: svc.name, cat: svc.cat, fields: r.clean, amount: r.amount, status: 'pending', note: '', ts, payVia: direct ? 'direct' : 'wallet' };
     order.pricing = pricingSnapshot(r.eff || svc, r.price); // frozen: later rate changes never touch this order
     if (r.variant) order.variant = { id: String(r.variant.id), name: clip(r.variant.name, 60), serviceId: clip(r.variant.serviceId, 40) };
+    if (svc.serviceId) order.provService = clip(svc.serviceId, 40);
     const key = 'o:' + sortKey(ts);
     let outBalance;
     if (direct) {
@@ -363,6 +430,7 @@ async function handleApi(req, env, url, path, u, secure) {
     ul.unshift({ key, id, status: order.status, ts, svcName: svc.name, amount: r.amount });
     await env.DATA.put('uo:' + u.id, JSON.stringify(ul.slice(0, 100)));
     if (order.api && order.api.state === 'queued') await apiqAdd(env, key);
+    await trackAdd(env, key, order);
     await bumpStat(env, 'orders');
     return json({ ok: true, order: { id, amount: r.amount, status: order.status }, balance: outBalance });
   }
@@ -503,6 +571,19 @@ async function handleGoogle(req, env, url, path, secure) {
 async function handleAdmin(req, env, url, path, u) {
   if (!u || u.role !== 'admin') return json({ ok: false, error: 'forbidden' }, 403);
 
+  if (path === '/api/admin/api-balance' && req.method === 'POST') {
+    let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
+    const settings = await getSettings(env);
+    const a = { url: clip(b.url, 300), format: b.format === 'json' ? 'json' : 'form', method: 'POST', headers: clip(b.headers, 2000) };
+    if (!/^https:\/\//i.test(a.url)) return json({ ok: false, error: 'url' }, 400);
+    let key = '';
+    try { const tpl = JSON.parse(String(b.body || '{}')); key = apiSubst(String(tpl.key || ''), {}, settings.apiSecrets || {}); } catch {}
+    try {
+      const { rr, data } = await callProvider(a, JSON.stringify({ key, action: 'balance' }), {}, settings);
+      return json({ ok: rr.ok && data && data.balance != null, status: rr.status, resp: typeof data === 'string' ? data.slice(0, 300) : data });
+    } catch (e) { return json({ ok: false, error: String((e && e.message) || e).slice(0, 200) }); }
+  }
+
   if (path === '/api/admin/backfill-topup' && req.method === 'POST') {
     const totals = {}; let cursor;
     do {
@@ -621,6 +702,7 @@ async function handleAdmin(req, env, url, path, u) {
       }
     }
     await env.DATA.put(b.key, JSON.stringify(o), { metadata: orderMeta(o) });
+    await trackAdd(env, b.key, o);
     await syncUserOrder(env, o);
     return json({ ok: true, status: o.status });
   }
@@ -881,6 +963,6 @@ export default {
     }
   },
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(retryApiQueue(env).catch(() => {}));
+    ctx.waitUntil(retryApiQueue(env).catch(() => {})); ctx.waitUntil(pollProviderStatus(env).catch(() => {}));
   },
 };
