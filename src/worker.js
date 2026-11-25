@@ -679,6 +679,17 @@ async function handleAdmin(req, env, url, path, u) {
       .map(async (k) => ({ key: k.name, ...(await env.DATA.get(k.name, 'json')) })));
     return json({ ok: true, items: items.filter((x) => x.id) });
   }
+  if (path === '/api/admin/order-delete' && req.method === 'POST') {
+    let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
+    const okey = clip(b.key, 60);
+    const o = await env.DATA.get(okey, 'json');
+    await env.DATA.delete(okey);
+    if (o && o.uid) { const ul = (await env.DATA.get('uo:' + o.uid, 'json')) || []; const n = ul.filter((x) => x.key !== okey); if (n.length !== ul.length) await env.DATA.put('uo:' + o.uid, JSON.stringify(n)); }
+    await apiqDrop(env, okey).catch(() => {});
+    const sq = (await env.DATA.get('smmq_index', 'json')) || []; if (sq.includes(okey)) await env.DATA.put('smmq_index', JSON.stringify(sq.filter((k) => k !== okey)));
+    return json({ ok: true });
+  }
+
   if (path === '/api/admin/order' && req.method === 'POST') {
     let b; try { b = await req.json(); } catch { return json({ ok: false, error: 'bad' }, 400); }
     const o = await env.DATA.get(clip(b.key, 60), 'json');

@@ -13,7 +13,7 @@
     plus: '<path d="M12 5v14M5 12h14"/>', x: '<path d="M18 6L6 18M6 6l12 12"/>', check: '<path d="M20 6L9 17l-5-5"/>', edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
     trash: '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13"/>', logout: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5M15 12H3"/>',
     refresh: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>', money: '<path d="M12 2v20M17 6a4 4 0 0 0-4-2H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6h-3a4 4 0 0 1-4-2"/>',
-    menu: '<path d="M3 6h18M3 12h18M3 18h18"/>', back: '<path d="M15 6l-6 6 6 6"/>', eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>', lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+    menu: '<path d="M3 6h18M3 12h18M3 18h18"/>', search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>', back: '<path d="M15 6l-6 6 6 6"/>', eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>', lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
     up: '<path d="M18 15l-6-6-6 6"/>', down: '<path d="M6 9l6 6 6-6"/>', home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
   };
   const icon = (n, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
@@ -82,19 +82,49 @@
   const stat = (ic, n, l, warn) => `<div class="stat ${warn ? 'warn' : ''}">${icon(ic)}<div class="n">${n}</div><div class="l">${l}</div></div>`;
 
   /* ---------- orders ---------- */
+  const ago = (ts) => { const d = Math.max(0, Date.now() - ts), m = 60000, h = 3600000, dy = 86400000; if (d < m) return 'just now'; if (d < h) return Math.floor(d / m) + 'm ago'; if (d < dy) return Math.floor(d / h) + 'h ago'; if (d < 30 * dy) return Math.floor(d / dy) + 'd ago'; return new Date(ts).toLocaleDateString('en-GB'); };
+  const uinitials = (n) => String(n || '?').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  const avColor = (sd) => { let h = 0; for (let i = 0; i < String(sd).length; i++) h = (h * 31 + String(sd).charCodeAt(i)) >>> 0; return `hsl(${h % 360} 55% 45%)`; };
+  let allOrders = [], orderSearch = '', orderPage = 1; const PER = 20;
   let orderFilter = '';
-  async function vOrders() {
-    const c = $('#content');
-    c.innerHTML = `<div class="tabs">${['', 'pending', 'processing', 'done', 'rejected'].map((s) => `<button data-of="${s}" class="${orderFilter === s ? 'on' : ''}">${s || 'All'}</button>`).join('')}</div><div id="olist"><div class="spin"></div></div>`;
-    const r = await api('/api/admin/orders' + (orderFilter ? '?status=' + orderFilter : ''));
-    $('#olist').innerHTML = (r.items && r.items.length) ? `<div class="card">${ordersTable(r.items)}</div>` : '<div class="empty">No orders</div>';
-  }
   function ordersTable(items) {
     return `<table class="tbl"><thead><tr><th>Order</th><th>Customer</th><th>Service</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
-      ${items.map((o) => `<tr><td class="mono">${esc(o.id)}<div class="muted">${new Date(o.ts).toLocaleString('en-GB')}</div></td>
+      ${items.map((o) => `<tr><td class="mono">${esc(o.id)}<div class="muted">${ago(o.ts)}</div></td>
         <td>${esc(o.uname || '')}</td><td>${esc(tl(o.svcName))}</td><td><b>${money(o.amount)}</b></td>
-        <td>${badge(o.status)}</td><td><button class="btn btn-ghost btn-sm" data-oview='${esc(JSON.stringify(o))}'>${icon('eye')}View</button></td></tr>`).join('')}
+        <td>${badge(o.status)}</td><td class="nowrap"><button class="btn btn-ghost btn-sm" data-oview='${esc(JSON.stringify(o))}'>Details</button></td></tr>`).join('')}
     </tbody></table>`;
+  }
+  async function vOrders() {
+    const c = $('#content'); c.innerHTML = '<div class="spin"></div>';
+    const r = await api('/api/admin/orders'); allOrders = r.items || []; orderPage = 1;
+    c.innerHTML = `<div class="list-bar">
+        <div class="list-search">${icon('search')}<input id="o-search" placeholder="Order ID, customer, product, TrxID…" value="${esc(orderSearch)}"></div>
+        <select id="o-filter" class="list-filt">${['', 'pending', 'processing', 'done', 'rejected'].map((st) => `<option value="${st}" ${orderFilter === st ? 'selected' : ''}>${st ? st[0].toUpperCase() + st.slice(1) : 'All'}</option>`).join('')}</select>
+      </div>
+      <div class="card tbl-wrap" id="olist"></div>
+      <div class="list-page" id="opage"></div>`;
+    $('#o-search').addEventListener('input', () => { orderSearch = $('#o-search').value; orderPage = 1; renderOrdersList(); });
+    $('#o-filter').addEventListener('change', () => { orderFilter = $('#o-filter').value; orderPage = 1; renderOrdersList(); });
+    renderOrdersList();
+  }
+  function renderOrdersList() {
+    const q = orderSearch.trim().toLowerCase();
+    let items = allOrders.filter((o) => (orderFilter ? o.status === orderFilter : true));
+    if (q) items = items.filter((o) => (o.id + ' ' + (o.uname || '') + ' ' + tl(o.svcName) + ' ' + ((o.pay && o.pay.trxid) || '')).toLowerCase().includes(q));
+    const total = items.length, pages = Math.max(1, Math.ceil(total / PER));
+    if (orderPage > pages) orderPage = pages;
+    const slice = items.slice((orderPage - 1) * PER, orderPage * PER);
+    const pay = (o) => o.payVia === 'direct' ? `Direct${o.pay && o.pay.trxid ? `<div class="muted mono">TX: ${esc(o.pay.trxid)}</div>` : ''}` : 'Wallet';
+    const sub = (o) => o.variant ? esc(o.variant.name) : (o.fields && o.fields.quantity ? '× ' + o.fields.quantity : esc(tl(o.svcName) !== (o.cat || '') ? '' : ''));
+    $('#olist').innerHTML = slice.length ? `<table class="tbl"><thead><tr><th>Order</th><th>Customer</th><th>Product</th><th>Amount</th><th>Payment</th><th>Status</th><th>Time</th><th>Actions</th></tr></thead><tbody>
+      ${slice.map((o) => `<tr><td class="mono">${esc(o.id)}<div class="muted">${new Date(o.ts).toLocaleDateString('en-GB')}</div></td>
+        <td>${esc(o.uname || '')}</td>
+        <td><b>${esc(tl(o.svcName))}</b>${sub(o) ? `<div class="muted">${sub(o)}</div>` : ''}</td>
+        <td><b>${money(o.amount)}</b></td><td>${pay(o)}</td><td>${badge(o.status)}</td><td class="muted nowrap">${ago(o.ts)}</td>
+        <td class="nowrap"><button class="btn btn-ghost btn-sm" data-oview='${esc(JSON.stringify(o))}'>Details</button><button class="ib" data-odel="${esc(o.key)}" title="Delete" style="color:var(--bad)">${icon('trash')}</button></td></tr>`).join('')}
+    </tbody></table>` : '<div class="empty">No orders</div>';
+    $('#opage').innerHTML = `<span class="muted">Page ${orderPage} of ${pages} • ${total} order${total === 1 ? '' : 's'}</span>
+      <div class="pg-btns"><button class="btn btn-ghost btn-sm" data-opg="-1" ${orderPage <= 1 ? 'disabled' : ''}>Prev</button><button class="btn btn-ghost btn-sm" data-opg="1" ${orderPage >= pages ? 'disabled' : ''}>Next</button></div>`;
   }
   function orderModal(o) {
     const svc = S.services.find((x) => x.id === o.svcId);
@@ -571,22 +601,41 @@
   }
 
   /* ---------- users ---------- */
-  let userFilter = '', allUsers = [];
+  let userFilter = '', allUsers = [], userSearch = '', userPage = 1, userSort = 'new';
   async function vUsers() {
     const c = $('#content'); c.innerHTML = '<div class="spin"></div>';
-    const r = await api('/api/admin/users'); allUsers = r.items || [];
-    renderUsers();
+    const r = await api('/api/admin/users'); allUsers = r.items || []; userPage = 1;
+    const filts = [['', 'All'], ['user', 'Users'], ['admin', 'Admins'], ['blocked', 'Blocked']];
+    c.innerHTML = `<div class="list-bar">
+        <div class="list-search">${icon('search')}<input id="u-search" placeholder="Name, email, or PIN…" value="${esc(userSearch)}"></div>
+        <select id="u-filt" class="list-filt">${filts.map(([k, l]) => `<option value="${k}" ${userFilter === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <select id="u-sort" class="list-filt">${[['new', 'Newest'], ['spend', 'Top spender'], ['bal', 'Top balance']].map(([k, l]) => `<option value="${k}" ${userSort === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      </div>
+      <div class="card tbl-wrap" id="ulist"></div>
+      <div class="list-page" id="upage"></div>`;
+    $('#u-search').addEventListener('input', () => { userSearch = $('#u-search').value; userPage = 1; renderUsersList(); });
+    $('#u-filt').addEventListener('change', () => { userFilter = $('#u-filt').value; userPage = 1; renderUsersList(); });
+    $('#u-sort').addEventListener('change', () => { userSort = $('#u-sort').value; userPage = 1; renderUsersList(); });
+    renderUsersList();
   }
-  function renderUsers() {
+  function renderUsersList() {
+    const q = userSearch.trim().toLowerCase();
     const match = (x) => userFilter === 'admin' ? x.role === 'admin' : userFilter === 'blocked' ? x.blocked : userFilter === 'user' ? (x.role !== 'admin' && !x.blocked) : true;
-    const cnt = (k) => allUsers.filter((x) => k === 'admin' ? x.role === 'admin' : k === 'blocked' ? x.blocked : k === 'user' ? (x.role !== 'admin' && !x.blocked) : true).length;
-    const items = allUsers.filter(match);
-    const tabs = [['', 'All'], ['user', 'Users'], ['admin', 'Admins'], ['blocked', 'Blocked']];
-    $('#content').innerHTML = `<div class="tabs">${tabs.map(([k, l]) => `<button data-uf="${k}" class="${userFilter === k ? 'on' : ''}">${l} <span class="count-i">${cnt(k)}</span></button>`).join('')}</div>
-      <div class="card"><table class="tbl"><thead><tr><th>Name</th><th>Email / Phone</th><th>Balance</th><th>Role</th><th></th></tr></thead><tbody>
-      ${items.length ? items.map((x) => `<tr><td><b>${esc(x.name)}</b> ${x.blocked ? '<span class="pill">blocked</span>' : ''}<div class="muted mono">${esc(x.ref)}</div></td><td class="mono">${x.email ? esc(x.email) : ''}${x.email && x.phone ? '<br>' : ''}${x.phone ? esc(x.phone) : ''}${!x.email && !x.phone ? '—' : ''}</td><td><b>${money(x.balance)}</b></td><td>${x.role === 'admin' ? '<span class="badge b-approved">admin</span>' : 'user'}</td>
-        <td><button class="btn btn-ghost btn-sm" data-user='${esc(JSON.stringify(x))}'>${icon('edit')}Manage</button></td></tr>`).join('') : '<tr><td colspan="5" class="muted" style="padding:20px;text-align:center">No users</td></tr>'}
-    </tbody></table></div>`;
+    let items = allUsers.filter(match);
+    if (q) items = items.filter((x) => (x.name + ' ' + (x.email || '') + ' ' + (x.phone || '') + ' ' + (x.ref || '')).toLowerCase().includes(q));
+    items = items.slice().sort((a, b) => userSort === 'spend' ? (b.topup || 0) - (a.topup || 0) : userSort === 'bal' ? (b.balance || 0) - (a.balance || 0) : (b.ts || 0) - (a.ts || 0));
+    const total = items.length, pages = Math.max(1, Math.ceil(total / PER));
+    if (userPage > pages) userPage = pages;
+    const slice = items.slice((userPage - 1) * PER, userPage * PER);
+    $('#ulist').innerHTML = slice.length ? `<table class="tbl"><thead><tr><th>User</th><th>Email</th><th>PIN</th><th>Role</th><th>Wallet</th><th>Total</th><th>Joined</th><th></th></tr></thead><tbody>
+      ${slice.map((x) => `<tr><td><div class="u-cell"><span class="u-av" style="background:${avColor(x.id || x.ref)}">${uinitials(x.name)}</span><div><b>${esc(x.name)}</b>${x.blocked ? ' <span class="pill">blocked</span>' : ''}<div class="muted">${x.phone ? esc(x.phone) : (x.role === 'admin' ? 'admin' : 'user')}</div></div></div></td>
+        <td class="mono">${x.email ? esc(x.email) : '—'}</td><td class="mono">${esc(x.ref || '')}</td>
+        <td>${x.role === 'admin' ? '<span class="badge b-approved">admin</span>' : 'user'}</td>
+        <td><b>${money(x.balance)}</b></td><td>${money(x.topup || 0)}</td><td class="muted nowrap">${ago(x.ts)}</td>
+        <td class="nowrap"><button class="btn btn-ghost btn-sm" data-user='${esc(JSON.stringify(x))}'>Manage</button></td></tr>`).join('')}
+    </tbody></table>` : '<div class="empty">No users</div>';
+    $('#upage').innerHTML = `<span class="muted">Page ${userPage} of ${pages} • ${total} user${total === 1 ? '' : 's'}</span>
+      <div class="pg-btns"><button class="btn btn-ghost btn-sm" data-upg="-1" ${userPage <= 1 ? 'disabled' : ''}>Prev</button><button class="btn btn-ghost btn-sm" data-upg="1" ${userPage >= pages ? 'disabled' : ''}>Next</button></div>`;
   }
   function userModal(x) {
     modal('Manage user', `<div class="kvs"><div><span class="k">Balance:</span> <b>${money(x.balance)}</b></div><div><span class="k">Referral code:</span> <b>${esc(x.ref || '')}</b></div></div>
@@ -877,9 +926,10 @@
     if (e.target.closest('[data-act="refresh"]')) { go(S.tab); loadCounts(); return; }
     if (e.target.closest('[data-act="logout"]')) { await api('/api/auth/logout', {}); location.reload(); return; }
     if (e.target.closest('[data-close]') || (e.target.classList && e.target.classList.contains('scrim'))) { closeModal(); return; }
-    const of = e.target.closest('[data-of]'); if (of) { orderFilter = of.dataset.of; vOrders(); return; }
+    const opg = e.target.closest('[data-opg]'); if (opg) { orderPage += +opg.dataset.opg; renderOrdersList(); return; }
+    const odel = e.target.closest('[data-odel]'); if (odel) { if (!confirm('Delete this order record? (does not refund)')) return; api('/api/admin/order-delete', { key: odel.dataset.odel }).then((r) => { if (r.ok) { allOrders = allOrders.filter((o) => o.key !== odel.dataset.odel); renderOrdersList(); toast('Deleted'); } }); return; }
     const df = e.target.closest('[data-df]'); if (df) { depFilter = df.dataset.df; vDeposits(); return; }
-    const uf = e.target.closest('[data-uf]'); if (uf) { userFilter = uf.dataset.uf; renderUsers(); return; }
+    const upg = e.target.closest('[data-upg]'); if (upg) { userPage += +upg.dataset.upg; renderUsersList(); return; }
     const ov = e.target.closest('[data-oview]'); if (ov) { try { orderModal(JSON.parse(ov.dataset.oview)); } catch (x) {} return; }
     const dok = e.target.closest('[data-dep-ok]'); if (dok) { if (confirm('Approve this deposit and add balance?')) { const r = await api('/api/admin/deposit', { key: dok.dataset.depOk, status: 'approved' }); if (r.ok) { toast('Approved'); vDeposits(); loadCounts(); } } return; }
     const dno = e.target.closest('[data-dep-no]'); if (dno) { if (confirm('Reject this deposit?')) { const r = await api('/api/admin/deposit', { key: dno.dataset.depNo, status: 'rejected' }); if (r.ok) { toast('Rejected'); vDeposits(); loadCounts(); } } return; }

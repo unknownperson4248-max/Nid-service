@@ -252,3 +252,18 @@ textarea{resize:vertical;min-height:60px}
 .var-wrap{padding:0 10px 10px 50px}
 .var-wrap .var-list{margin-bottom:8px}
 .var-mini .ib[disabled]{opacity:.35;pointer-events:none}
+/* list toolbar (search + filters) for Orders / Users */
+.list-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.list-search{flex:1 1 220px;min-width:180px;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:0 12px}
+.list-search .ic{width:18px;height:18px;color:var(--muted);flex:none}
+.list-search input{border:0;outline:0;background:none;flex:1;padding:11px 0;font-size:14px}
+.list-filt{flex:0 0 auto;background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 12px;font-size:14px;font-weight:600}
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl-wrap .tbl{min-width:620px}
+.tbl td.nowrap,.tbl th.nowrap{white-space:nowrap}
+.u-cell{display:flex;align-items:center;gap:10px;min-width:0}
+.u-av{width:34px;height:34px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-weight:700;font-size:12.5px}
+.u-cell b{font-size:13.5px}
+.list-page{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:12.5px}
+.pg-btns{display:flex;gap:8px}
+.pg-btns .btn[disabled]{opacity:.4;pointer-events:none}
