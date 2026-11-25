@@ -340,8 +340,8 @@
             <button type="button" class="pay-opt" data-pay="direct"><span class="pay-ic">${icon('card')}</span><b>${en ? 'Direct' : 'ডাইরেক্ট'}</b><small>bKash, Nagad…</small></button>
           </div>
           <div id="pay-direct" style="display:none">
-            <div class="pay-note">${en ? 'Send the order amount to one of these, then enter the TrxID. Admin verifies & delivers.' : 'নিচের যেকোনো নম্বরে অর্ডার অ্যামাউন্ট সেন্ড মানি করে TrxID দিন। এডমিন ভেরিফাই করে ডেলিভার করবে।'}</div>
-            ${methods.length ? `<div class="pm-list">${methods.map((m) => (m.numbers || []).filter((n) => n.number).map((n) => `<label class="pm-opt"><input type="radio" name="dmethod" value="${esc(m.label + ' (' + n.number + ')')}"><span class="pm-main"><b>${esc(m.label)}</b>${n.type ? `<em>${esc(n.type)}</em>` : ''}<code>${esc(n.number)}</code></span><span class="pm-copy" data-copy="${esc(n.number)}">${icon('copy')}</span></label>`).join('')).join('')}</div>` : `<div class="muted" style="font-size:12.5px">${en ? 'No payment numbers set yet.' : 'এখনো পেমেন্ট নম্বর সেট করা হয়নি।'}</div>`}
+            <div class="pay-note">${en ? 'Send' : 'নিচের নম্বরে'} <b class="pay-amt" id="pay-amt">${money(0)}</b> ${en ? 'to one of these numbers, then enter the TrxID. Admin verifies & delivers.' : 'সেন্ড মানি করে TrxID দিন। এডমিন ভেরিফাই করে ডেলিভার করবে।'}</div>
+            <div class="pm-list" id="pm-list"></div>
             <div class="field"><label>TrxID <span class="req">*</span></label><input name="dtrxid" maxlength="40" placeholder="TrxID"></div>
           </div>
           <input type="hidden" name="payVia" value="wallet">
@@ -352,10 +352,28 @@
       <div style="height:10px"></div>`;
     const form = $('#svc-form');
     const walletBal = S.user.balance || 0;
+    let lastAmt = -1;
+    // show only the payment numbers whose amount range fits the order total
+    const renderPm = (amount) => {
+      const host = $('#pm-list'); if (!host) return;
+      const prev = (form.querySelector('[name=dmethod]:checked') || {}).value || '';
+      const rows = [];
+      methods.forEach((m) => (m.numbers || []).forEach((n) => {
+        if (!n.number) return;
+        const mn = +n.min || 0; const mx = (n.max == null || n.max === '') ? null : +n.max;
+        if (amount > 0 && (amount < mn || (mx != null && amount > mx))) return; // out of this number's range
+        const val = m.label + ' (' + n.number + ')';
+        rows.push(`<label class="pm-opt"><input type="radio" name="dmethod" value="${esc(val)}" ${val === prev ? 'checked' : ''}><span class="pm-main"><b>${esc(m.label)}</b>${n.type ? `<em>${esc(n.type)}</em>` : ''}<code>${esc(n.number)}</code></span><span class="pm-copy" data-copy="${esc(n.number)}">${icon('copy')}</span></label>`);
+      }));
+      host.innerHTML = rows.length ? rows.join('')
+        : `<div class="muted" style="font-size:12.5px;padding:4px 2px">${methods.length ? (en ? 'No payment number accepts this amount — try a different amount or ask support.' : 'এই অ্যামাউন্টের জন্য কোনো পেমেন্ট নম্বর নেই — অন্য অ্যামাউন্ট দিন বা সাপোর্টে বলুন।') : (en ? 'No payment numbers set yet.' : 'এখনো পেমেন্ট নম্বর সেট করা হয়নি।')}</div>`;
+    };
     const recalc = () => {
       const total = calcPrice(s, formVals(form));
       $('#ord-total').textContent = money(total);
+      const pa = $('#pay-amt'); if (pa) pa.textContent = money(total);
       const wb = $('.pay-wbal'); if (wb) wb.innerHTML = (total > 0 && walletBal < total) ? `<span class="pay-low">${en ? 'Low balance' : 'ব্যালেন্স কম'}</span>` : money(walletBal);
+      if (total !== lastAmt) { lastAmt = total; renderPm(total); }
     };
     const selectPay = (mode) => { form.querySelector('[name=payVia]').value = mode; form.querySelectorAll('.pay-opt').forEach((b) => b.classList.toggle('on', b.dataset.pay === mode)); const pd = $('#pay-direct'); if (pd) pd.style.display = mode === 'direct' ? '' : 'none'; };
     form.querySelectorAll('.pay-opt').forEach((b) => b.addEventListener('click', () => selectPay(b.dataset.pay)));
