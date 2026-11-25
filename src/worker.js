@@ -255,7 +255,10 @@ async function handleApi(req, env, url, path, u, secure) {
 
   if (path === '/api/home') {
     const [services, cats, notices] = await Promise.all([getServices(env), getCats(env), getNotices(env)]);
-    const live = (await env.DATA.list({ prefix: 'o:', limit: 12 })).keys.map((k) => k.metadata).filter(Boolean);
+    // live feed from a cached array (get) to avoid a KV list() on every home load;
+    // fall back to list() but never let it break the home page
+    let live = (await env.DATA.get('live_orders', 'json')) || null;
+    if (!live) { try { live = (await env.DATA.list({ prefix: 'o:', limit: 12 })).keys.map((k) => k.metadata).filter(Boolean); } catch { live = []; } }
     return json({ ok: true, user: u ? pubUser(u) : null, settings: pubSettings(settings),
       services: services.filter((s) => s.active).map(({ api, ...rest }) => rest), cats, notices, live });
   }
