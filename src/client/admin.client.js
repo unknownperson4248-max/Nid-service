@@ -188,16 +188,19 @@
     </div>`;
   }
   const varRate = (v) => { const P = v.pricing || {}; return P.mode !== 'fixed' ? `৳${P.basePrice != null ? P.basePrice : '?'} / ${P.baseQty != null ? P.baseQty : '?'} · min ${P.minQty != null ? P.minQty : 1} · max ${P.maxQty ? P.maxQty : '∞'}` : `৳${v.price || 0}`; };
-  const varMiniRow = (svcId, i, v) => `<div class="var-mini">
+  const varMiniRow = (svcId, i, v, total) => `<div class="var-mini">
       <div class="var-mini-main"><b>${esc(v.name || '(no name)')}</b><small>${varRate(v)}${v.serviceId ? ' · SMM ' + esc(v.serviceId) : ''}${v.active === false ? ' · off' : ''}</small></div>
+      <button type="button" class="ib" data-move-var="${svcId}:${i}:up" title="Move up" ${i === 0 ? 'disabled' : ''}>${icon('up')}</button>
+      <button type="button" class="ib" data-move-var="${svcId}:${i}:down" title="Move down" ${i === total - 1 ? 'disabled' : ''}>${icon('down')}</button>
       <button type="button" class="ib" data-edit-var2="${svcId}:${i}" title="Edit">${icon('edit')}</button>
       <button type="button" class="ib" data-del-var2="${svcId}:${i}" title="Delete" style="color:var(--bad)">${icon('trash')}</button></div>`;
   function prodRow(s) {
     const priceLbl = (s.price || 0) > 0 ? money(s.price) : (s.fields || []).some((f) => f.type === 'select') ? 'from options' : 'free';
     const vars = s.variants || []; const vo = varOpen[s.id];
-    return `<div class="prod-wrap"><div class="prod-row" data-prod="${s.id}">
-      <span class="prod-thumb">${s.image ? `<img src="${esc(s.image)}" alt="">` : `<span style="background:${s.color || '#0f766e'}">${icon(iconName(s.icon))}</span>`}</span>
-      <div class="prod-info"><b>${esc(tl(s.name))}</b><small>${esc(tl(s.sub))} • ${priceLbl}${s.featured ? ' • ★ featured' : ''}</small></div>
+    return `<div class="prod-wrap${vo ? ' vopen' : ''}"><div class="prod-row">
+      <button type="button" class="ib prod-chev" data-prod-tog="${s.id}" title="Sub-products">${icon('right')}</button>
+      <span class="prod-thumb" data-prod-tog="${s.id}">${s.image ? `<img src="${esc(s.image)}" alt="">` : `<span style="background:${s.color || '#0f766e'}">${icon(iconName(s.icon))}</span>`}</span>
+      <div class="prod-info" data-prod-tog="${s.id}"><b>${esc(tl(s.name))}</b><small>${esc(tl(s.sub))} • ${priceLbl}${s.featured ? ' • ★' : ''}${vars.length ? ` • ${vars.length} sub-product${vars.length > 1 ? 's' : ''}` : ''}</small></div>
       <div class="prod-actions">
         <label class="tgl" title="Active"><input type="checkbox" data-toggle-svc="${s.id}" ${s.active !== false ? 'checked' : ''}><i></i></label>
         <button type="button" class="ib" data-move-svc="${s.id}:up" title="Move up">${icon('up')}</button>
@@ -206,11 +209,8 @@
         <button type="button" class="ib" data-del-svc="${s.id}" title="Delete" style="color:var(--bad)">${icon('trash')}</button>
       </div>
     </div>
-      <div class="var-area${vo ? ' open' : ''}">
-        <button type="button" class="var-tog" data-var-tog="${s.id}">${icon('right')}<span>Sub-products</span><span class="pill">${vars.length}</span></button>
-        ${vo ? `<div class="var-list">${vars.map((v, i) => varMiniRow(s.id, i, v)).join('')}${vars.length ? '' : `<div class="muted" style="padding:7px 10px;font-size:12.5px">No sub-products — this product uses its own price. Add one for Followers / Likes / Views etc.</div>`}
-          <button type="button" class="btn btn-ghost btn-sm" data-add-var2="${s.id}">${icon('plus')}Add sub-product</button></div>` : ''}
-      </div>
+      ${vo ? `<div class="var-wrap"><div class="var-list">${vars.map((v, i) => varMiniRow(s.id, i, v, vars.length)).join('')}${vars.length ? '' : `<div class="muted" style="padding:7px 10px;font-size:12.5px">No sub-products yet — this product uses its own price.</div>`}</div>
+        <button type="button" class="btn btn-ghost btn-sm" data-add-var2="${s.id}">${icon('plus')}Add sub-product</button></div>` : ''}
     </div>`;
   }
   function variantModal(svcId, vi) {
@@ -901,7 +901,8 @@
     }
     const es = e.target.closest('[data-edit-svc]'); if (es) { editService(es.dataset.editSvc); return; }
     const ds = e.target.closest('[data-del-svc]'); if (ds) { if (confirm('Delete this product?')) { const list = S.services.filter((x) => x.id !== ds.dataset.delSvc); if (await saveServiceList(list)) { toast('Deleted'); renderServiceTree(); } } return; }
-    const vtog = e.target.closest('[data-var-tog]'); if (vtog) { varOpen[vtog.dataset.varTog] = !varOpen[vtog.dataset.varTog]; vServices(); return; }
+    const ptog = e.target.closest('[data-prod-tog]'); if (ptog) { varOpen[ptog.dataset.prodTog] = !varOpen[ptog.dataset.prodTog]; vServices(); return; }
+    const mvar = e.target.closest('[data-move-var]'); if (mvar) { const [vs, vi, dir] = mvar.dataset.moveVar.split(':'); const sp = S.services.find((x) => x.id === vs); if (sp && sp.variants) { const a = sp.variants, j = +vi, k = dir === 'up' ? j - 1 : j + 1; if (k >= 0 && k < a.length) { [a[j], a[k]] = [a[k], a[j]]; varOpen[vs] = true; saveServiceList(S.services).then((ok) => { if (ok) vServices(); }); } } return; }
     const avar = e.target.closest('[data-add-var2]'); if (avar) { variantModal(avar.dataset.addVar2, -1); return; }
     const evar = e.target.closest('[data-edit-var2]'); if (evar) { const [vs, vi] = evar.dataset.editVar2.split(':'); variantModal(vs, +vi); return; }
     const dvar = e.target.closest('[data-del-var2]'); if (dvar) { const [vs, vi] = dvar.dataset.delVar2.split(':'); if (!confirm('Delete this sub-product?')) return; const sp = S.services.find((x) => x.id === vs); if (sp && sp.variants) { sp.variants.splice(+vi, 1); saveServiceList(S.services).then((ok) => { if (ok) { toast('Deleted'); vServices(); } }); } return; }
