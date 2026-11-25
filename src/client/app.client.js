@@ -226,7 +226,7 @@
     const isEn = S.lang === 'en';
     const sections = [];
     const featured = active.filter((s) => s.featured);
-    if (featured.length) sections.push({ name: isEn ? 'Popular Now' : 'জনপ্রিয়', items: featured });
+    if (featured.length) sections.push({ name: 'Popular', items: featured });
     cats.forEach((c) => { const items = active.filter((s) => (s.cat || '') === c.id); if (items.length) sections.push({ name: t(c.name), items }); });
     if (uncat.length) sections.push({ name: isEn ? 'Other' : 'অন্যান্য', items: uncat });
     void catTabs; void shown;

@@ -13,7 +13,7 @@
     plus: '<path d="M12 5v14M5 12h14"/>', x: '<path d="M18 6L6 18M6 6l12 12"/>', check: '<path d="M20 6L9 17l-5-5"/>', edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
     trash: '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13"/>', logout: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5M15 12H3"/>',
     refresh: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>', money: '<path d="M12 2v20M17 6a4 4 0 0 0-4-2H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6h-3a4 4 0 0 1-4-2"/>',
-    menu: '<path d="M3 6h18M3 12h18M3 18h18"/>', search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>', back: '<path d="M15 6l-6 6 6 6"/>', eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>', lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+    menu: '<path d="M3 6h18M3 12h18M3 18h18"/>', star: '<path d="M12 3l2.9 5.9 6.1.9-4.5 4.4 1 6.1L12 17.8 6.5 20.3l1-6.1L3 9.8l6.1-.9z"/>', trend: '<path d="M3 17l6-6 4 4 7-7"/><path d="M14 7h4v4"/>', search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>', back: '<path d="M15 6l-6 6 6 6"/>', eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>', lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
     up: '<path d="M18 15l-6-6-6 6"/>', down: '<path d="M6 9l6 6 6-6"/>', home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
   };
   const icon = (n, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
@@ -68,13 +68,22 @@
   async function vDash() {
     const c = $('#content'); c.innerHTML = '<div class="spin"></div>';
     const r = await api('/api/admin/overview'); const s = r.stats || {};
+    const daily = s.daily || [];
+    const dname = (iso) => { const [y, m, d] = iso.split('-'); return d + '/' + m; };
     c.innerHTML = `<div class="stats">
       ${stat('box', s.orders || 0, 'Total orders')}
+      ${stat('star', s.completed || 0, 'Completed')}
+      ${stat('money', money(s.revenue || 0), 'Revenue')}
+      ${stat('trend', money(s.todaySales || 0), "Today's sales")}
+      ${stat('trend', money(s.monthSales || 0), 'This month')}
       ${stat('box', s.pendingOrders || 0, 'Pending orders', s.pendingOrders > 0)}
       ${stat('wallet', s.pendingDeposits || 0, 'Pending deposits', s.pendingDeposits > 0)}
       ${stat('users', s.users || 0, 'Users')}
-      ${stat('money', money(s.revenue || 0), 'Revenue (done)')}
     </div>
+    <div class="card"><div class="card-h">${icon('trend')}Daily sales (last 14 days)</div>
+      <div class="tbl-wrap tbl-fit"><table class="tbl"><thead><tr><th>Date</th><th>Orders</th><th>Sales</th></tr></thead><tbody>
+      ${daily.length ? daily.map((d) => `<tr><td class="nowrap">${dname(d.date)} <span class="muted">${d.date.slice(0, 4)}</span></td><td>${d.orders}</td><td><b>${money(d.sales)}</b></td></tr>`).join('') : '<tr><td colspan="3" class="muted" style="text-align:center;padding:18px">No sales yet</td></tr>'}
+      </tbody></table></div></div>
     <div class="card"><div class="card-h">${icon('box')}Recent orders<button class="btn btn-sm" data-tab="orders" style="margin-left:auto">All</button></div><div id="dash-orders"><div class="spin"></div></div></div>`;
     const o = await api('/api/admin/orders'); const items = (o.items || []).slice(0, 8);
     $('#dash-orders').innerHTML = items.length ? ordersTable(items) : '<div class="empty">No orders</div>';
@@ -232,6 +241,7 @@
       <span class="prod-thumb" data-prod-tog="${s.id}">${s.image ? `<img src="${esc(s.image)}" alt="">` : `<span style="background:${s.color || '#0f766e'}">${icon(iconName(s.icon))}</span>`}</span>
       <div class="prod-info" data-prod-tog="${s.id}"><b>${esc(tl(s.name))}</b><small>${esc(tl(s.sub))} • ${priceLbl}${s.featured ? ' • ★' : ''}${vars.length ? ` • ${vars.length} sub-product${vars.length > 1 ? 's' : ''}` : ''}</small></div>
       <div class="prod-actions">
+        <button type="button" class="ib star-btn ${s.featured ? 'on' : ''}" data-star-svc="${s.id}" title="${s.featured ? 'Featured (Popular) — tap to remove' : 'Mark as Popular'}">${icon('star')}</button>
         <label class="tgl" title="Active"><input type="checkbox" data-toggle-svc="${s.id}" ${s.active !== false ? 'checked' : ''}><i></i></label>
         <button type="button" class="ib" data-move-svc="${s.id}:up" title="Move up">${icon('up')}</button>
         <button type="button" class="ib" data-move-svc="${s.id}:down" title="Move down">${icon('down')}</button>
@@ -951,6 +961,7 @@
     }
     const es = e.target.closest('[data-edit-svc]'); if (es) { editService(es.dataset.editSvc); return; }
     const ds = e.target.closest('[data-del-svc]'); if (ds) { if (confirm('Delete this product?')) { const list = S.services.filter((x) => x.id !== ds.dataset.delSvc); if (await saveServiceList(list)) { toast('Deleted'); renderServiceTree(); } } return; }
+    const star = e.target.closest('[data-star-svc]'); if (star) { const sp = S.services.find((x) => x.id === star.dataset.starSvc); if (sp) { sp.featured = !sp.featured; saveServiceList(S.services).then((ok) => { if (ok) { toast(sp.featured ? 'Added to Popular ★' : 'Removed from Popular'); vServices(); } }); } return; }
     const ptog = e.target.closest('[data-prod-tog]'); if (ptog) { varOpen[ptog.dataset.prodTog] = !varOpen[ptog.dataset.prodTog]; vServices(); return; }
     const mvar = e.target.closest('[data-move-var]'); if (mvar) { const [vs, vi, dir] = mvar.dataset.moveVar.split(':'); const sp = S.services.find((x) => x.id === vs); if (sp && sp.variants) { const a = sp.variants, j = +vi, k = dir === 'up' ? j - 1 : j + 1; if (k >= 0 && k < a.length) { [a[j], a[k]] = [a[k], a[j]]; varOpen[vs] = true; saveServiceList(S.services).then((ok) => { if (ok) vServices(); }); } } return; }
     const avar = e.target.closest('[data-add-var2]'); if (avar) { variantModal(avar.dataset.addVar2, -1); return; }

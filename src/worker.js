@@ -668,8 +668,18 @@ async function handleAdmin(req, env, url, path, u) {
     ]);
     const pend = orders.keys.filter((k) => k.metadata && k.metadata.status === 'pending').length;
     const pdep = deps.keys.filter((k) => k.metadata && k.metadata.status === 'pending').length;
-    const revenue = orders.keys.reduce((s, k) => s + ((k.metadata && k.metadata.status === 'done' && k.metadata.amt) || 0), 0);
-    return json({ ok: true, stats: { orders: orders.keys.length, pendingOrders: pend, deposits: deps.keys.length, pendingDeposits: pdep, users: users.keys.length, revenue } });
+    // sales reporting (Bangladesh day, UTC+6)
+    const BD = 6 * 3600000, dayKey = (ts) => new Date((ts || 0) + BD).toISOString().slice(0, 10);
+    const todayK = dayKey(Date.now()), monthK = todayK.slice(0, 7);
+    let revenue = 0, todaySales = 0, monthSales = 0, done = 0; const daily = {};
+    for (const k of orders.keys) {
+      const m = k.metadata; if (!m) continue;
+      const dk = dayKey(m.ts), d = daily[dk] || (daily[dk] = { o: 0, s: 0 });
+      d.o++;
+      if (m.status === 'done') { done++; const amt = m.amt || 0; revenue += amt; d.s += amt; if (dk === todayK) todaySales += amt; if (dk.slice(0, 7) === monthK) monthSales += amt; }
+    }
+    const dailyArr = Object.keys(daily).sort().reverse().slice(0, 14).map((dk) => ({ date: dk, orders: daily[dk].o, sales: daily[dk].s }));
+    return json({ ok: true, stats: { orders: orders.keys.length, pendingOrders: pend, deposits: deps.keys.length, pendingDeposits: pdep, users: users.keys.length, revenue, completed: done, todaySales, monthSales, daily: dailyArr } });
   }
 
   if (path === '/api/admin/orders') {

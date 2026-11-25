@@ -111,6 +111,12 @@ textarea{resize:vertical;min-height:60px}
   .tbl,.tbl tbody,.tbl tr,.tbl td{display:block;width:100%}
   .tbl tr{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;padding:6px;background:#fff}
   .tbl td{border:0;padding:6px 10px}
+  /* tables inside a scroll wrapper stay as real tables (slide sideways) instead of stacking */
+  .tbl-wrap .tbl thead{display:table-header-group}
+  .tbl-wrap .tbl,.tbl-wrap .tbl tbody{display:table;width:100%}
+  .tbl-wrap .tbl tbody{display:table-row-group}
+  .tbl-wrap .tbl tr{display:table-row;border:0;border-radius:0;margin:0;padding:0;background:none}
+  .tbl-wrap .tbl td{display:table-cell;border-bottom:1px solid var(--line);padding:11px 12px}
 }
 .qa-row{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
 .qa{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:11px;border:1.5px solid var(--line);background:#fff;font-weight:600;font-size:13px;color:var(--ink);transition:border-color .15s}
@@ -267,3 +273,11 @@ textarea{resize:vertical;min-height:60px}
 .list-page{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:12.5px}
 .pg-btns{display:flex;gap:8px}
 .pg-btns .btn[disabled]{opacity:.4;pointer-events:none}
+
+/* featured star toggle on product rows */
+.star-btn{color:#cbd5e1}
+.star-btn.on{color:#f59e0b}
+.star-btn.on .ic{fill:#f59e0b}
+/* narrow tables (daily sales) fit without horizontal scroll */
+.tbl-wrap.tbl-fit{overflow-x:visible}
+.tbl-wrap.tbl-fit .tbl{min-width:0}
