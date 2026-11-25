@@ -199,7 +199,7 @@ function apiSubst(tpl, order, secrets) {
     .replace(/\{(\w+)\}/g, (_, k) => {
       if (k === 'amount' || k === 'total') return String(order.amount);
       if (k === 'orderId') return String(order.id);
-      if (k === 'service') return String((order.variant && order.variant.serviceId) || order.provService || ''); // sub-product id, else product id
+      if (k === 'service') return String((order.variant && order.variant.serviceId) || order.provService || '').replace(/^\s*id[\s:_#-]*/i, '').trim(); // sub-product id, else product id; tolerate an "ID:" prefix
       if (k === 'extId') return String((order.api && order.api.extId) || '');
       const v = order.fields && order.fields[k];
       return v == null ? '' : String(v);

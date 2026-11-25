@@ -23,14 +23,15 @@
   let S = { me: null, tab: 'dash', stats: {}, services: [], cats: [], menuOpen: false };
 
   /* ---------- boot ---------- */
-  async function boot() { const me = await api('/api/me'); S.me = me.user; root.setAttribute('aria-busy', 'false'); if (!S.me) return renderLogin(); if (S.me.role !== 'admin') return renderNoAdmin(); const ov = await api('/api/admin/overview'); if (ov && ov.error === 'locked') return renderUnlock(); renderShell(); go('dash'); }
+  const startTab = () => { if (location.hash === '#apikeys') { S.setTab = 'api'; return 'settings'; } return 'dash'; };
+  async function boot() { const me = await api('/api/me'); S.me = me.user; root.setAttribute('aria-busy', 'false'); if (!S.me) return renderLogin(); if (S.me.role !== 'admin') return renderNoAdmin(); const ov = await api('/api/admin/overview'); if (ov && ov.error === 'locked') return renderUnlock(); renderShell(); go(startTab()); }
   function renderUnlock(err) {
     root.innerHTML = `<div class="login"><form class="login-card" id="uf"><div class="mark">${icon('lock')}</div><h2>Admin panel locked</h2><p>Enter the admin panel password</p>
       ${err ? `<div class="err">${esc(err)}</div>` : ''}
       <div class="field"><label>Admin password</label><input name="pass" type="password" autocomplete="off" required autofocus></div>
       <button class="btn" style="width:100%">${icon('lock')}Unlock</button>
       <button type="button" class="btn btn-ghost btn-sm" data-act="logout" style="width:100%;margin-top:8px">Logout</button></form></div>`;
-    $('#uf').addEventListener('submit', async (e) => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); const r = await api('/api/admin/unlock', { pass: d.pass }); if (r.ok) { renderShell(); go('dash'); } else renderUnlock('Wrong password'); });
+    $('#uf').addEventListener('submit', async (e) => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); const r = await api('/api/admin/unlock', { pass: d.pass }); if (r.ok) { renderShell(); go(startTab()); } else renderUnlock('Wrong password'); });
   }
   function renderLogin(err) {
     root.innerHTML = `<div class="login"><form class="login-card" id="lf"><div class="mark">${icon('lock')}</div><h2>Admin Login</h2><p>WizeFF TopUp</p>
@@ -38,7 +39,7 @@
       <div class="field"><label>Email or phone</label><input name="id" type="text" autocomplete="username" maxlength="120" placeholder="you@gmail.com" required></div>
       <div class="field"><label>Password</label><input name="password" type="password" required></div>
       <button class="btn" style="width:100%">${icon('lock')}Login</button></form></div>`;
-    $('#lf').addEventListener('submit', async (e) => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); const r = await api('/api/auth/login', d); if (r.ok && r.user.role === 'admin') { S.me = r.user; renderShell(); go('dash'); } else if (r.ok) renderNoAdmin(); else renderLogin('Wrong number or password'); });
+    $('#lf').addEventListener('submit', async (e) => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); const r = await api('/api/auth/login', d); if (r.ok && r.user.role === 'admin') { S.me = r.user; renderShell(); go(startTab()); } else if (r.ok) renderNoAdmin(); else renderLogin('Wrong number or password'); });
   }
   function renderNoAdmin() { root.innerHTML = `<div class="login"><div class="login-card" style="text-align:center"><div class="mark">${icon('lock')}</div><h2>Not an admin</h2><p>This account has no admin access.</p><a class="btn" href="/">Go to app</a></div></div>`; }
 
