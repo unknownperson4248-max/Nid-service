@@ -757,6 +757,22 @@ select option{background:#141922;color:var(--lx-ink)}
 .tab-pls.on .pls{box-shadow:0 8px 16px -6px rgba(201,153,47,.9)}
 .tab-pls::before{display:none!important}
 
+/* reference-style home: titled category sections + framed product cards */
+.cat-h{display:flex;align-items:center;gap:10px;margin:20px 2px 12px;font-family:var(--disp);font-weight:800;font-size:19px;color:var(--lx-ink,#f2f0ea);letter-spacing:-.01em}
+.cat-h::before{content:"";width:4px;height:22px;border-radius:3px;background:var(--gold-g);flex:none}
+.cat-h::after{content:"";flex:1;height:1px;margin-left:8px;background:linear-gradient(90deg,rgba(232,195,121,.35),transparent)}
+.qgrid .qs{padding:6px!important;border-radius:16px!important;border:1px solid rgba(232,195,121,.18)!important;box-shadow:0 10px 22px -16px #000,inset 0 1px 0 rgba(255,255,255,.04)!important}
+.qgrid .qs-art{border-radius:11px!important}
+.qgrid .qs-lbl{padding:8px 3px 4px}
+.qgrid .qs-lbl b{font-size:12.5px!important;font-weight:600;line-height:1.25}
+/* header: keep the brand name readable on phones */
+.top-in{gap:8px}
+.top-right{gap:7px}
+.top-in .logo{flex:1 1 auto}
+.top-in .logo-img{width:34px;height:34px}
+.top-in .logo-t{font-size:15px;letter-spacing:-.01em}
+.top-in .wallet{padding:6px 10px;font-size:13px;gap:5px}
+@media (max-width:380px){.top-in .logo-t{font-size:13px}}
 /* category filter tabs (side-by-side, selectable) */
 .cat-tabs{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 0 12px;margin-top:2px}
 .cat-tabs::-webkit-scrollbar{display:none}

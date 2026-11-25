@@ -222,9 +222,17 @@
     const sel = S.homeCat;
     const shown = sel === '__all' ? active : sel === '__other' ? uncat : active.filter((s) => (s.cat || '') === sel);
     const catTabs = tabList.length > 1 ? `<div class="cat-tabs">${tabList.map((c) => `<button class="cat-tab ${c.id === sel ? 'on' : ''}" data-cat="${esc(c.id)}">${esc(t(c.name))}</button>`).join('')}</div>` : '';
-    const catSections = active.length
-      ? `${catTabs}<div class="qgrid">${shown.length ? shown.map(qsCard).join('') : emptyBox(u('services'))}</div>`
-      : `<div class="sec-h">${icon('bolt')}${u('quickServices')}</div><div class="qgrid">${emptyBox(u('services'))}</div>`;
+    // reference layout: featured -> "Popular Now", then one titled section per category
+    const isEn = S.lang === 'en';
+    const sections = [];
+    const featured = active.filter((s) => s.featured);
+    if (featured.length) sections.push({ name: isEn ? 'Popular Now' : 'জনপ্রিয়', items: featured });
+    cats.forEach((c) => { const items = active.filter((s) => (s.cat || '') === c.id); if (items.length) sections.push({ name: t(c.name), items }); });
+    if (uncat.length) sections.push({ name: isEn ? 'Other' : 'অন্যান্য', items: uncat });
+    void catTabs; void shown;
+    const catSections = sections.length
+      ? sections.map((sec) => `<div class="cat-h"><span>${esc(sec.name)}</span></div><div class="qgrid">${sec.items.map(qsCard).join('')}</div>`).join('')
+      : `<div class="cat-h"><span>${u('quickServices')}</span></div><div class="qgrid">${emptyBox(u('services'))}</div>`;
     const B = S.settings || {};
     const en = S.lang === 'en';
     const banners = (B.banners || []).filter((b) => b && b.img);
