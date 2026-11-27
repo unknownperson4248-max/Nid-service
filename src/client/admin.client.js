@@ -201,28 +201,33 @@
         <span class="muted">${S.services.length} products in ${cats.length} categories</span>
       </div>
       <div id="svc-tree">
-        ${cats.map((cat) => catSection(cat)).join('')}
+        ${cats.filter((c) => !c.parent).map((cat) => catSection(cat)).join('')}
         ${uncat.length ? catSection({ id: '__none', name: 'Uncategorized' }, uncat) : ''}
       </div>`;
   }
-  function catSection(cat, overrideProducts) {
+  function catSection(cat, overrideProducts, sub) {
     const products = (overrideProducts || S.services.filter((s) => (s.cat || '') === cat.id)).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    const children = (cat.id === '__none' || sub) ? [] : S.cats.filter((c) => c.parent === cat.id).sort((a, b) => (a.order || 0) - (b.order || 0));
+    const total = products.length + children.reduce((n, ch) => n + S.services.filter((x) => (x.cat || '') === ch.id).length, 0);
     const open = catOpen[cat.id] !== false;
-    return `<div class="cat-sec${open ? ' open' : ''}">
+    return `<div class="cat-sec${open ? ' open' : ''}${sub ? ' cat-sub' : ''}">
       <div class="cat-head" data-cat-toggle="${esc(cat.id)}">
         <button type="button" class="ib cat-chev">${icon('down')}</button>
         <b>${esc(tl(cat.name))}</b>
-        <span class="pill">${products.length}</span>
+        <span class="pill">${total}</span>
         ${cat.id !== '__none' ? `<div class="cat-actions">
           <button type="button" class="btn btn-ghost btn-sm" data-add-prod="${esc(cat.id)}">${icon('plus')}Add product</button>
+          ${sub ? '' : `<button type="button" class="ib" data-add-subcat="${esc(cat.id)}" title="Add sub-group">${icon('grid')}</button>`}
           <button type="button" class="ib" data-move-cat="${esc(cat.id)}:up" title="Move up">${icon('up')}</button>
           <button type="button" class="ib" data-move-cat="${esc(cat.id)}:down" title="Move down">${icon('down')}</button>
-          <button type="button" class="ib" data-edit-cat="${esc(cat.id)}" title="Edit category">${icon('edit')}</button>
-          <button type="button" class="ib" data-del-cat="${esc(cat.id)}" title="Delete category" style="color:var(--bad)">${icon('trash')}</button>
+          <button type="button" class="ib" data-edit-cat="${esc(cat.id)}" title="Edit">${icon('edit')}</button>
+          <button type="button" class="ib" data-del-cat="${esc(cat.id)}" title="Delete" style="color:var(--bad)">${icon('trash')}</button>
         </div>` : ''}
       </div>
       <div class="cat-body" ${open ? '' : 'hidden'}>
-        ${products.map((s) => prodRow(s)).join('') || `<div class="empty" style="padding:18px">No products yet</div>`}
+        ${products.map((x) => prodRow(x)).join('')}
+        ${children.map((ch) => catSection(ch, null, true)).join('')}
+        ${(!products.length && !children.length) ? `<div class="empty" style="padding:18px">No products yet</div>` : ''}
       </div>
     </div>`;
   }
@@ -451,7 +456,7 @@
         <textarea id="f-gnote" rows="2" maxlength="500" placeholder="e.g. Clan ID koi pabe — chobi dekhun" style="margin-top:8px">${esc(s.guideNote || '')}</textarea>
         <div class="muted" style="font-size:11px;margin-top:4px">A help box (image + text) shown below the order form, to guide buyers. Max 2MB.</div></div>
       <div class="grid2">
-        <div class="field"><label>Category</label><select id="f-cat">${S.cats.map((c) => `<option value="${esc(c.id)}" ${s.cat === c.id ? 'selected' : ''}>${esc(tl(c.name))}</option>`).join('')}</select></div>
+        <div class="field"><label>Category</label><select id="f-cat">${(() => { const top = S.cats.filter((c) => !c.parent); return top.map((c) => `<option value="${esc(c.id)}" ${s.cat === c.id ? 'selected' : ''}>${esc(tl(c.name))}</option>` + S.cats.filter((ch) => ch.parent === c.id).map((ch) => `<option value="${esc(ch.id)}" ${s.cat === ch.id ? 'selected' : ''}>&nbsp;&nbsp;— ${esc(tl(ch.name))}</option>`).join('')).join(''); })()}</select></div>
         <div class="field"><label>Icon (if no image)</label><select id="f-icon">${['bolt', 'diamond', 'crown', 'thumb', 'phone', 'wallet', 'box', 'grid', 'money', 'eye'].map((n) => `<option value="${n}" ${s.icon === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
         <div class="field"><label>Color</label><input id="f-color" type="color" value="${esc(s.color || '#0f766e')}" style="height:42px;padding:3px"></div>
       </div>
@@ -595,17 +600,21 @@
 
   /* ---------- categories ---------- */
   async function saveCats(cats) { const r = await api('/api/admin/cats', { cats }); if (r.ok) { S.cats = cats; return true; } toast('Error'); return false; }
-  function catModal(cat) {
-    const isNew = !cat; const c0 = cat || { id: '', name: '' };
+  function catModal(cat, presetParent) {
+    const isNew = !cat; const c0 = cat || { id: '', name: '', parent: presetParent || '' };
+    const parentOpts = S.cats.filter((x) => !x.parent && x.id !== c0.id);
     modal(isNew ? 'Add category' : 'Edit category', `
-      <div class="field"><label>Category name <span class="req">*</span></label><input id="c-name" value="${esc(tl(c0.name))}" placeholder="e.g. গেম টপ-আপ"></div>
+      <div class="field"><label>Category name <span class="req">*</span></label><input id="c-name" value="${esc(tl(c0.name))}" placeholder="e.g. AI Tools"></div>
+      <div class="field"><label>Parent group <span class="hint">(optional — nests this under another)</span></label>
+        <select id="c-parent"><option value="">— None (top level) —</option>${parentOpts.map((x) => `<option value="${esc(x.id)}" ${c0.parent === x.id ? 'selected' : ''}>${esc(tl(x.name))}</option>`).join('')}</select></div>
       <div class="field"><label>ID / link (english) <span class="hint">(auto if empty)</span></label><input id="c-id" value="${esc(c0.id)}" placeholder="auto" ${isNew ? '' : 'readonly'}><div class="muted" style="font-size:11px;margin-top:4px">${isNew ? 'Used internally; cannot change later.' : 'ID cannot be changed.'}</div></div>`,
       `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok" id="c-save">${icon('check')}${isNew ? 'Create' : 'Save'}</button>`);
     $('#c-save').addEventListener('click', async () => {
       const nm = $('#c-name').value.trim(); if (!nm) { toast('Enter a category name'); return; }
+      const parent = $('#c-parent').value || '';
       const cats = S.cats.map((x) => ({ ...x }));
-      if (!isNew) { const ex = cats.find((x) => x.id === c0.id); if (ex) ex.name = nm; }
-      else { let id = ($('#c-id').value.trim() || nm.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')) || 'c' + Math.random().toString(36).slice(2, 6); while (cats.some((x) => x.id === id)) id += Math.random().toString(36).slice(2, 3); cats.push({ id, name: nm, order: cats.length }); }
+      if (!isNew) { const ex = cats.find((x) => x.id === c0.id); if (ex) { ex.name = nm; if (parent && cats.some((y) => y.parent === ex.id)) { toast('This group already has sub-groups'); return; } ex.parent = parent; } }
+      else { let id = ($('#c-id').value.trim() || nm.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')) || 'c' + Math.random().toString(36).slice(2, 6); while (cats.some((x) => x.id === id)) id += Math.random().toString(36).slice(2, 3); cats.push({ id, name: nm, order: cats.length, parent }); }
       if (await saveCats(cats)) { toast(isNew ? 'Category added ✓' : 'Saved ✓'); closeModal(); vServices(); }
     });
   }
@@ -944,10 +953,11 @@
     const dok = e.target.closest('[data-dep-ok]'); if (dok) { if (confirm('Approve this deposit and add balance?')) { const r = await api('/api/admin/deposit', { key: dok.dataset.depOk, status: 'approved' }); if (r.ok) { toast('Approved'); vDeposits(); loadCounts(); } } return; }
     const dno = e.target.closest('[data-dep-no]'); if (dno) { if (confirm('Reject this deposit?')) { const r = await api('/api/admin/deposit', { key: dno.dataset.depNo, status: 'rejected' }); if (r.ok) { toast('Rejected'); vDeposits(); loadCounts(); } } return; }
     if (e.target.closest('[data-act="new-svc"]')) { newService(); return; }
+    const addSub = e.target.closest('[data-add-subcat]'); if (addSub) { catModal(null, addSub.dataset.addSubcat); return; }
     const addProd = e.target.closest('[data-add-prod]'); if (addProd) { newService(addProd.dataset.addProd === '__none' ? '' : addProd.dataset.addProd); return; }
     if (e.target.closest('[data-act="new-cat"]')) { catModal(null); return; }
     const editCat = e.target.closest('[data-edit-cat]'); if (editCat) { const cat = S.cats.find((x) => x.id === editCat.dataset.editCat); if (cat) catModal(cat); return; }
-    const delCat = e.target.closest('[data-del-cat]'); if (delCat) { const id = delCat.dataset.delCat; const has = S.services.some((s) => (s.cat || '') === id); if (confirm(has ? 'Delete this category? Its products will move to Uncategorized.' : 'Delete this category?')) { const cats = S.cats.filter((x) => x.id !== id); if (await saveCats(cats)) { toast('Category deleted'); vServices(); } } return; }
+    const delCat = e.target.closest('[data-del-cat]'); if (delCat) { const id = delCat.dataset.delCat; const has = S.services.some((s) => (s.cat || '') === id); const kids = S.cats.some((x) => x.parent === id); if (confirm(has || kids ? 'Delete this category? Its products move to Uncategorized and any sub-groups become top-level.' : 'Delete this category?')) { const cats = S.cats.filter((x) => x.id !== id).map((x) => x.parent === id ? { ...x, parent: '' } : x); if (await saveCats(cats)) { toast('Category deleted'); vServices(); } } return; }
     const moveCat = e.target.closest('[data-move-cat]'); if (moveCat) { const [id, dir] = moveCat.dataset.moveCat.split(':'); const cats = S.cats.slice().sort((a, b) => (a.order || 0) - (b.order || 0)); const idx = cats.findIndex((x) => x.id === id); const sw = dir === 'up' ? idx - 1 : idx + 1; if (idx < 0 || sw < 0 || sw >= cats.length) return; cats.forEach((x, i) => { x.order = i; }); const t = cats[idx].order; cats[idx].order = cats[sw].order; cats[sw].order = t; if (await saveCats(cats)) { toast('Moved'); vServices(); } return; }
     const catTog = e.target.closest('[data-cat-toggle]'); if (catTog) { const id = catTog.dataset.catToggle; catOpen[id] = catOpen[id] === false; renderServiceTree(); return; }
     const toggleSvc = e.target.closest('[data-toggle-svc]'); if (toggleSvc) { const s = S.services.find((x) => x.id === toggleSvc.dataset.toggleSvc); if (s) { s.active = toggleSvc.checked; await saveServiceList(S.services); } return; }

@@ -227,11 +227,18 @@
     const sections = [];
     const featured = active.filter((s) => s.featured);
     if (featured.length) sections.push({ name: 'Popular', items: featured });
-    cats.forEach((c) => { const items = active.filter((s) => (s.cat || '') === c.id); if (items.length) sections.push({ name: t(c.name), items }); });
-    if (uncat.length) sections.push({ name: isEn ? 'Other' : 'অন্যান্য', items: uncat });
+    const allSorted = (S.cats || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    allSorted.filter((c) => !c.parent).forEach((tc) => {
+      const own = active.filter((s) => (s.cat || '') === tc.id);
+      const kids = allSorted.filter((c) => c.parent === tc.id).map((ch) => ({ ch, items: active.filter((s) => (s.cat || '') === ch.id) })).filter((x) => x.items.length);
+      if (!own.length && !kids.length) return;
+      sections.push({ name: t(tc.name), items: own, sub: false });
+      kids.forEach((x) => sections.push({ name: t(x.ch.name), items: x.items, sub: true }));
+    });
+    if (uncat.length) sections.push({ name: isEn ? 'Other' : 'অন্যান্য', items: uncat, sub: false });
     void catTabs; void shown;
     const catSections = sections.length
-      ? sections.map((sec) => `<div class="cat-h"><span>${esc(sec.name)}</span></div><div class="qgrid">${sec.items.map(qsCard).join('')}</div>`).join('')
+      ? sections.map((sec) => `<div class="${sec.sub ? 'subcat-h' : 'cat-h'}"><span>${esc(sec.name)}</span></div>${sec.items.length ? `<div class="qgrid">${sec.items.map(qsCard).join('')}</div>` : ''}`).join('')
       : `<div class="cat-h"><span>${u('quickServices')}</span></div><div class="qgrid">${emptyBox(u('services'))}</div>`;
     const B = S.settings || {};
     const en = S.lang === 'en';

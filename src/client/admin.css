@@ -281,3 +281,6 @@ textarea{resize:vertical;min-height:60px}
 /* narrow tables (daily sales) fit without horizontal scroll */
 .tbl-wrap.tbl-fit{overflow-x:visible}
 .tbl-wrap.tbl-fit .tbl{min-width:0}
+/* nested sub-group in the admin product tree */
+.cat-sec.cat-sub{margin:8px 0 8px 14px;border-left:2px solid var(--line);background:#fcfdfe}
+.cat-sec.cat-sub>.cat-head b{font-size:14px}
