@@ -243,7 +243,7 @@
     const vars = s.variants || []; const vo = varOpen[s.id];
     return `<div class="prod-wrap${vo ? ' vopen' : ''}"><div class="prod-row">
       <button type="button" class="prod-chev" data-prod-tog="${s.id}" title="Sub-products">${icon('down')}</button>
-      <span class="prod-thumb" data-prod-tog="${s.id}">${s.image ? `<img src="${esc(s.image)}" alt="">` : `<span style="background:${s.color || '#0f766e'}">${icon(iconName(s.icon))}</span>`}</span>
+      <span class="prod-thumb" data-prod-tog="${s.id}">${s.image ? `<img src="${esc(s.image)}" alt="">` : `<span class="prod-mono" style="background:${s.color || '#0f766e'}">${esc(String(tl(s.name) || '?').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase())}</span>`}</span>
       <div class="prod-info" data-prod-tog="${s.id}"><b>${esc(tl(s.name))}</b><small>${esc(tl(s.sub))} • ${priceLbl}${s.featured ? ' • ★' : ''}${vars.length ? ` • ${vars.length} sub-product${vars.length > 1 ? 's' : ''}` : ''}</small></div>
       <div class="prod-actions">
         <button type="button" class="ib star-btn ${s.featured ? 'on' : ''}" data-star-svc="${s.id}" title="${s.featured ? 'Featured (Popular) — tap to remove' : 'Mark as Popular'}">${icon('star')}</button>
